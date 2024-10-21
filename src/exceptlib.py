@@ -1,20 +1,14 @@
 """exceptlib"""
 import sys
-import threading
-import traceback
 
+from functools import reduce
 from logging import getLogger
-from types import ModuleType, TracebackType
+from os import path
+from types import ModuleType
 from typing import Tuple
-
-from importlib.util import spec_from_file_location
-from importlib.util import module_from_spec
 
 
 logger = getLogger(__name__)
-
-
-type ExceptionTuple = Tuple[BaseException | Exception]
 
 
 class NotThisException(BaseException):
@@ -23,78 +17,116 @@ class NotThisException(BaseException):
     def __init_subclass__(cls) -> None:
         """return None"""
         raise Exception("subclassing not recommended")
+    
+
+class ExceptionProfiler:
+    """exception profiler"""
+    pass
+    # decorate a function with exc_from_mod and use it for custom or
+    # default profiling. Custom profiling is acheived through hooks
+    # that are passed in during instantiation, while defaul profiling
+    # will use exceptlib's logger to emit key details from the module,
+    # possibly including package metadata. ...
+
+class ExceptionGrouper:
+    """exception grouper"""
+    pass
+    # uses ast to parse the module its instanted in to search for any
+    # raise clauses, through its classmethod find. From the set of
+    # raise clauses found, exceptions are extracted and used to create
+    # and return an exception group. By default, find explores the
+    # current module and its children.
 
 
-def exc_from_mod(*modules: ModuleType, **kwargs) -> ExceptionTuple:
+def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
     """return Tuple[BaseException]
     
     :param *modules: zero or more module objects
     :param **kwargs: zero or more configuration arguments
 
     Accept one or more module object arguments, and return a tuple of
-    exception objects. If the module object is attributed to the root
+    exception objects. If the module object is attributed to the
     exception currently being raised, then return a tuple with at least
     the current exception. Otherwise return an tuple whose lone
     exception is an `exceptlib.NotThisException` class.
 
-    Default behavior can be tuned in a few ways.
+    Default behavior can be tuned in a few ways. ...
     """
     logger.debug("exc_from_mod: enter")
 
-    thread_id = kwargs.get("thread_id", threading.get_ident())
-    logger.debug("exc_from_mod: thread_id=%i", thread_id)
-
     # obtain current exception from all based on thread id
-    exc = sys._current_exceptions().get(thread_id)
+    exc = sys.exception()
     if exc is None:
-        logger.debug("exc_from_mod: no exception; thread_id=%i", thread_id)
-        raise RuntimeError("thread has no exception")
+        logger.exception("exc_from_mod: no exception")
+        raise Exception("no exception")
+        # TODO: verify isolation of exception
+    
+    # don't be passive
+    if not modules:
+        logger.debug("exc_from_mod: no modules")
+        return (exc,)
 
     # container for modules encountered in traceback objects
-    trb_mods = list()
+    mods = list()
 
     # loop through all the traceback objects
     trb = exc.__traceback__
     while trb is not None:
 
-        # obtain module and add to set of modules
-        trb_mod = mod_from_trb(trb)
-        trb_mods.append(trb_mod)
+        # obtain file name and module name
+        file_name = trb.tb_frame.f_code.co_filename
+        logger.debug("exc_from_mod: file_name=%s", file_name)
 
-        # run a hook if module is not in a normal place
-        if trb_mod not in sys.modules:
-            logger.debug(
-                "exc_from_mod: %s not in sys.modules", trb_mod.__name__
-            )
-            kwargs.get("module_missing_hook", lambda e: None)(exc)
+        # look for the module in sys.module first
+        trb_mods = list()
+        if (sys_mods := mods_from_filename(file_name, sys.modules)):
+            logger.debug("exc_from_mod: not in sys.modules")
+            trb_mods += sys_mods
+        if (global_mods := mods_from_filename(file_name, globals)):
+            logger.debug("exc_from_mod: not in sys.modules")
+            trb_mods += global_mods
 
-        # reset the traceback
+        # append this level's mods and reset the traceback
+        mods.append(trb_mods)
         trb = trb.tb_next
 
+    # default return value
+    result = (NotThisException,)
+
     # evaluate if module of root traceback object is implicated
-    if kwargs.get("root_only", False) and trb_mods[-1] in modules:
-        return (exc,)
+    if kwargs.get("root_only", False) and trb_mods[-1]:
+        if not set(trb_mods[-1]).isdisjoint(set(modules)):
+            result = (exc,)
 
     # otherwise evaluate if any modules are implicated
-    trb_mods = set(trb_mods)
-    if trb_mods - set(modules) != trb_mods:
-        return (exc,)
+    mods = reduce(lambda x,y: x + y, mods)
+    if not set(mods).isdisjoint(set(modules)):
+        result = (exc,)
     
-    # finally raise a never-to-match exception
-    else:
-        return (NotThisException,)
-    # TODO: multiple exceptions, eg "raise x from y"
+    # cleanup and return result
+    logger.debug("exc_from_mod: exc=%s", result)
+    return result
 
 
-def mod_from_trb(traceback: TracebackType) -> ModuleType:
-    """return TracebackType
+def mods_from_filename(file_name: str, search_space: dict) -> ModuleType:
+    """return ModuleType
     
-    :param traceback: the traceback object to evaluate
+    :param file_name: file name string
+    :param search_space: arbitrary mapping
     
-    Accept a traceback object, extract from the corresponding code
-    object its filename, and try to return a module object.
+    Accept a filename object and return module or None.
     """
-    logger.debug("mod_from_trb: enter")
-    return module_from_spec(
-        spec_from_file_location(traceback.tb_frame.f_code.co_filename)
-    )
+    logger.debug("mod_from_filename: enter")
+
+    # ensure file_name refers to existing file
+    if not path.exists(file_name):
+        logger.exception("mod_from_filename: dne; file_name=%s", file_name)
+        return None
+
+    # look for and return matches
+    matches = list()
+    for value in search_space.values():
+        if hasattr(value, __file__) and value.__file__ == file_name:
+            logger.debug("mod_from_filename: %s found", value.__name__)
+            matches.append(value)
+    return matches
