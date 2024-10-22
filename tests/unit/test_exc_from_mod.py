@@ -47,5 +47,7 @@ class SequentialTestCase(unittest.TestCase):
         # input with root_only
         try:
             re_obj = re.match(None)
-        except exceptlib.exc_from_mod(re, root_only=True) as e:
+        except exceptlib.exc_from_mod(re, any_traceback=True) as e:
             self.assertIsInstance(e, TypeError)
+
+    

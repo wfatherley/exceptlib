@@ -1,9 +1,10 @@
 """exceptlib"""
+import ast
 import sys
 
 from functools import reduce
 from logging import DEBUG, getLogger
-from os import path
+from pathlib import Path
 from types import ModuleType
 from typing import Tuple
 
@@ -28,14 +29,63 @@ class ExceptionProfiler:
     # will use exceptlib's logger to emit key details from the module,
     # possibly including package metadata. ...
 
-class ExceptionGrouper:
-    """exception grouper"""
-    pass
-    # uses ast to parse the module to search for any
-    # raise clauses, through its classmethod find. From the set of
-    # raise clauses found, exceptions are extracted and used to create
-    # and return an exception group. By default, find explores the
-    # current module and its children.
+
+class ExceptionTuple(tuple):
+    """exception tuple"""
+    
+    @classmethod
+    def find(cls, *exclude: BaseException, **kwargs) -> Tuple[BaseException]:
+        """return Tuple[BaseException]
+        
+        :param *exclude: zero or more exception objects
+        :param **kwargs: zero or more configuration arguments
+
+        Return a tuple of distinct exception classes found in the
+        calling module. This classmethod searches the module's AST
+        for `raise` statements, extracts their exception class, and
+        adds them to an internal set. After the search, the set is cast
+        to a tuple and returned.
+
+
+        """
+        log_level = kwargs.get("log_level", DEBUG)
+        logger.log(log_level, "ExceptionGrouper.walk: enter")
+
+        # verify being called in a module
+        path_obj = Path(__file__)
+        if not path_obj.exists():
+            raise Exception("uncallable; search in globals")
+
+        excs = set()
+        for node in ast.walk(ast.parse(path_obj.read_text())):
+
+            # skip over non raise nodes
+            if not isinstance(node, ast.Raise):
+                continue
+
+            # case when exc is NoneType
+            if node.exc is None:
+                continue
+
+            # case when exc is ast.Name
+            name_id = getattr(node.exc, "id", None)
+
+            # cases when exc is ast.Call
+            if name_id is None:
+
+                # case when func is ast.Name
+                name_id = getattr(node.exc.func, "id", None)
+                
+                # case when func is ast.Attribute
+                if isinstance(node.exc.func, ast.Attribute):
+                    name_id = node.exc.func.value.id
+
+            # add the exception to exception set
+            if (exc := eval(name_id)) not in exclude:
+                excs.add(exc)
+
+        # instantiate and return exception group
+        return tuple(excs)
 
 
 def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
@@ -44,13 +94,26 @@ def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
     :param *modules: zero or more module objects
     :param **kwargs: zero or more configuration arguments
 
-    Accept one or more module object arguments, and return a tuple of
-    exception objects. If the module object is attributed to the
-    exception currently being raised, then return a tuple with at least
-    the current exception. Otherwise return an tuple whose lone
-    exception is an `exceptlib.NotThisException` class.
+    Return a tuple of exceptions if a module object in `modules` is the
+    root cause of the current exception. Raise `RuntimeError` if there
+    is no current exception, or if any of the objects in `modules` is
+    not of type `ModuleType`. Currently, the tuple of exceptions always
+    contains one exception-- the current exception, again, if one of
+    `modules` is its root cause, or `exceptlib.NotThisException` if
+    none of `modules` is implicated as root cause of current exception.
 
-    Default behavior can be tuned in a few ways. ...
+    This function is designed to be called as the predicate of an
+    `except` clause, so that the clause may be entered based on module
+    rather than exception identity. Set optional keyword argument
+    `any_traceback` to `True` to return a tuple with the current
+    exception if any of `modules` is specified in any traceback. Pass
+    optional keyword argument `log_level` with a valid logging level to
+    set `exceptlib`'s logger to that level.
+
+    The exception `exceptlib.NotThisException` is a direct subclass of
+    built-in `BaseException`, so that the chance of entering an
+    `except` block spuriously is limited only to use of
+    `NotThisException` outside of module `exceptlib`.
     """
     log_level = kwargs.get("log_level", DEBUG)
     logger.log(log_level, "exc_from_mod: enter")
@@ -91,7 +154,7 @@ def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
         sys_mods = mods_from_filename(
             file_name, sys.modules, log_level=log_level
         )
-        if sys_mods:
+        if sys_mods is not None:
             logger.log(log_level, "exc_from_mod: sys_mods=%s", sys_mods)
             trb_mods += sys_mods
 
@@ -99,7 +162,7 @@ def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
         global_mods = mods_from_filename(
             file_name, globals(), log_level=log_level
         )
-        if global_mods:
+        if global_mods is not None:
             logger.log(log_level, "exc_from_mod: global_mods=%s", global_mods)
             trb_mods += global_mods
 
@@ -112,7 +175,7 @@ def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
     logger.log(log_level, "exc_from_mod: result=%s", result)
 
     # evaluate if module of root traceback object is implicated
-    if kwargs.get("root_only", False) and trb_mods[-1]:
+    if not kwargs.get("any_traceback", False) and trb_mods[-1]:
         if not set(trb_mods[-1]).isdisjoint(set(modules)):
             result = (exc_t,)
             logger.log(
@@ -120,10 +183,11 @@ def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
             )
 
     # otherwise evaluate if any modules are implicated
-    mods = reduce(lambda x,y: x + y, mods)
-    if not set(mods).isdisjoint(set(modules)):
-        result = (exc_t,)
-        logger.log(log_level, "exc_from_mod: any level result=%s", result)
+    else:
+        mods = reduce(lambda x,y: x + y, mods)
+        if not set(mods).isdisjoint(set(modules)):
+            result = (exc_t,)
+            logger.log(log_level, "exc_from_mod: any level result=%s", result)
     
     # cleanup and return result
     logger.log(log_level, "exc_from_mod: exc=%s", result)
@@ -145,7 +209,7 @@ def mods_from_filename(
     logger.log(log_level, "mod_from_filename: enter; file_name=%s", file_name)
 
     # ensure file_name refers to existing file
-    if not path.exists(file_name):
+    if not Path(file_name).exists():
         logger.log(log_level, "mod_from_filename: file not found")
         return None
 
@@ -153,8 +217,9 @@ def mods_from_filename(
     matches = list()
     for value in search_space.values():
         if hasattr(value, "__file__") and value.__file__ == file_name:
-            logger.log(
-                log_level, "mod_from_filename: %s found", value.__name__
-            )
+            logger.log(log_level, "mod_from_filename: mod=%s", value.__name__)
             matches.append(value)
     return matches
+
+
+exceptions = ExceptionTuple.find()

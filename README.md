@@ -17,21 +17,15 @@ This library extends some of Python's exception handling mechanisms. Currently i
 Handling exceptions by module, e.g.,
 
 ```python
->>> import re, statistics, urllib
->>> from exceptlib import exc_from_mod
->>> 
->>> try:
-...     a = parse.quote("python.org.:443/not found") # no raise
-...     b = statistics.mean([1,2,3])                 # no raise
-...     b = re.compile(7)                            # raise
-... except exc_from_mod(statistics, urllib)
-...     print("error came from statistics or urllib")
-... except exc_from_mod(re):
-...     print("error came from re")
-```
+import re, statistics, urllib
+from exceptlib import exc_from_mod
 
-results in:
-
-```
-error came from re 
+try:
+    a = parse.quote("python.org.:443/not found")  # no raise
+    b = statistics.mean([1,2,3])                  # no raise
+    b = re.compile(7)                             # raise
+except exc_from_mod(statistics, urllib)
+    print("error came from statistics or urllib") # no print
+except exc_from_mod(re):
+    print("error came from re")                   # print
 ```
