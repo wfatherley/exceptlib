@@ -1,12 +1,14 @@
 """exceptlib"""
 import ast
+import os
 import sys
 
+from _thread import _ExceptHookArgs
 from functools import reduce
 from logging import DEBUG, getLogger
 from pathlib import Path
-from types import ModuleType
-from typing import Tuple
+from types import ModuleType, TracebackType
+from typing import Tuple, AnyStr
 
 
 logger = getLogger(__name__)
@@ -21,8 +23,53 @@ class NotThisException(BaseException):
     
 
 class ExceptionProfiler:
-    """exception profiler"""
-    pass
+    """exception profiler
+    
+    notes
+    =====
+    - dependency cycles
+
+    partition exceptions by:
+        - standard library modules
+        - individual third party modules
+    
+    
+    """
+    def __enter__(self) -> ExceptionProfiler:
+        """return ExceptionProfiler"""
+        # load config here
+        return self
+    
+    def __exit__(
+        self,
+        exc_typ: BaseException,
+        exc_val: BaseException,
+        exc_trb: TracebackType
+    ) -> None:
+        """return None"""
+        return None
+    
+    def __init__(self, configuration_file: AnyStr) -> None:
+        """return None"""
+        
+        return None
+
+    def sys_except_hook(
+        self,
+        exc_typ: BaseException,
+        exc_val: BaseException,
+        exc_trb: TracebackType
+    ) -> None:
+        """return None"""
+        ...
+
+    def sys_unraisable_hook(self, unraisable: BaseException) -> None:
+        """return None"""
+        ...
+
+    def threading_except_hook(self, args: _ExceptHookArgs, /) -> None:
+        """return None"""
+        ...
     # decorate a function with exc_from_mod and use it for custom or
     # default profiling. Custom profiling is acheived through hooks
     # that are passed in during instantiation, while defaul profiling
@@ -32,6 +79,7 @@ class ExceptionProfiler:
 
 class ExceptionTuple(tuple):
     """exception tuple"""
+    # maybe call aggregator?
     
     @classmethod
     def find(cls, *exclude: BaseException, **kwargs) -> Tuple[BaseException]:
@@ -44,17 +92,15 @@ class ExceptionTuple(tuple):
         calling module. This classmethod searches the module's AST
         for `raise` statements, extracts their exception class, and
         adds them to an internal set. After the search, the set is cast
-        to a tuple and returned.
-
-
+        to an exception tuple and returned.
         """
         log_level = kwargs.get("log_level", DEBUG)
-        logger.log(log_level, "ExceptionGrouper.walk: enter")
+        logger.log(log_level, "ExceptionGrouper.find: enter")
 
         # verify being called in a module
         path_obj = Path(__file__)
         if not path_obj.exists():
-            raise Exception("uncallable; search in globals")
+            raise Exception("not found; search in globals")
 
         excs = set()
         for node in ast.walk(ast.parse(path_obj.read_text())):
@@ -84,8 +130,8 @@ class ExceptionTuple(tuple):
             if (exc := eval(name_id)) not in exclude:
                 excs.add(exc)
 
-        # instantiate and return exception group
-        return tuple(excs)
+        # instantiate and return exception tuple
+        return cls(excs)
 
 
 def exc_from_mod(*modules: ModuleType, **kwargs) -> Tuple[BaseException]:
@@ -222,4 +268,5 @@ def mods_from_filename(
     return matches
 
 
+# scrape exceptlib exceptions
 exceptions = ExceptionTuple.find()
