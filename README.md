@@ -29,7 +29,7 @@ try:
     a = parse.quote("python.org.:443/not found")  # no raise
     b = statistics.mean([1,2,3])                  # no raise
     b = re.compile(7)                             # raise TypeError
-except exc_from_mod(statistics, urllib)
+except exc_from_mod(statistics, urllib):
     print("error came from statistics or urllib") # no print
 except IndexError:
     print("it was index error")                   # no print
