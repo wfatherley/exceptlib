@@ -1,5 +1,6 @@
 """exceptlib"""
 import ast
+import inspect
 import sys
 
 from functools import reduce
@@ -7,6 +8,8 @@ from logging import getLogger
 from pathlib import Path
 from types import ModuleType
 from typing import Tuple
+
+from importlib.util import module_from_spec, spec_from_file_location
 
 
 logger = getLogger(__name__)
@@ -59,14 +62,23 @@ class ExceptionFrom(tuple):
         to an exception tuple and returned.
         """
         logger.debug("ExceptionFrom.find: enter")
-
-        # verify being called in a module
         path_obj = Path(__file__)
         if not path_obj.exists():
             raise Exception("not found; search in globals")
+        module = module_from_spec(
+            spec_from_file_location(__name__, __file__)
+        )
+        return cls(get_raised(module))
 
-        excs = set()
-        for node in ast.walk(ast.parse(path_obj.read_text())):
+
+def get_raised(*modules: ModuleType) -> tuple:
+    """return tuple"""
+    logger.debug("get_raised: enter")
+    exceptions = set()
+    for module in modules:
+        with open(inspect.getfile(module), "r") as file_obj:
+            module_ast = ast.parse(file_obj.read())
+        for node in ast.walk(module_ast):
 
             # skip over non raise nodes
             if not isinstance(node, ast.Raise):
@@ -90,17 +102,10 @@ class ExceptionFrom(tuple):
                     name_id = node.exc.func.value.id
 
             # add the exception to exception set
-            if (exc := eval(name_id)) not in exclude:
-                excs.add(exc)
+            exceptions.add(eval(name_id))
 
         # instantiate and return exception tuple
-        return cls(excs)
-
-
-def get_raised(*modules: ModuleType) -> tuple:
-    """return tuple"""
-    logger.debug("get_raised: enter")
-    
+        return tuple(exceptions)
     
 
 def evaluate_implicated(
