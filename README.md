@@ -23,25 +23,58 @@ import urllib
 
 from exceptlib import exc_from_mod
 
-...
 
 try:
     a = parse.quote("python.org.:443/not found")  # no raise
     b = statistics.mean([1,2,3])                  # no raise
-    b = re.compile(7)                             # raise TypeError
+    c = re.compile(7)                             # raise TypeError
 except exc_from_mod(statistics, urllib):
-    print("error came from statistics or urllib") # no print
+    print("hello from statistics and urllib") # no print
 except IndexError:
-    print("it was index error")                   # no print
+    print("it was index error")               # no print
 except exc_from_mod(re):
-    print("error came from re")                   # print
+    print("hello from re")                    # print
 except TypeError:
-    print("would execute if not caught already")  # no print
+    print("it was a type error")              # no print
 
-...
 ```
 
 While this example is contrived for demonstration, the utility of `exceptlib.exc_from_mod` spans program flexibility and development operations:
 
  - enable certain retries during exception handling with less boilerplate;
  - enhance regression or performance testing facilities for 3rd party libraries.
+
+
+```python
+with exceptlib.ExceptionProfiler():
+    my_program.run()
+```
+
+
+```python
+try:
+    ...
+except SomeException:
+    raise swap_traceback(...) from ...
+
+    # ???
+```
+
+## change
+Instead of `exc_from_mod` and various other names, suppose `ExceptionFrom` as a class with these patterns:
+
+```python
+import re, urllib
+
+# a tuple of exceptions raised in this source file
+these_exc_tuple = ExceptionFrom.here()
+
+# a tuple of exceptions raised by the input module sources
+exc_tuple = ExceptionFrom(re, urllib)
+
+try:
+    ...
+except ExceptionFrom(re, urllib):
+    # enters *iff* the exception root is from re or urllib
+    ...
+```
