@@ -6,6 +6,8 @@ import sys
 from functools import reduce
 from logging import getLogger
 from pathlib import Path
+from random import sample
+from string import ascii_letters
 from types import ModuleType
 from typing import Tuple
 
@@ -13,6 +15,12 @@ from importlib.util import module_from_spec, spec_from_file_location
 
 
 logger = getLogger(__name__)
+
+
+def random_exception() -> BaseException:
+    """return BaseException"""
+    logger.debug("random_exception: enter")
+    return type("".join(sample(ascii_letters, 15)), (BaseException,), {})
 
 
 class NotThisException(BaseException):
@@ -32,7 +40,26 @@ class ExceptionFrom(tuple):
         :param *target_modules: sequence of module objects
         :param **kwargs: optional keyword arguments
         
+        Construct self, a tuple of zero or more exception types. The
+        elements in this tuple depend on two factors-- if the thread
+        has a current exception and which module objects are passed in.
 
+        When there is a current exception and one of the input module
+        objects raised the exception, then this is a length-one tuple
+        whose element is the exception type. There is an optional
+        keyword argument, ``root_only``, which when set to ``False``
+        makes this a length-one tuple of the current exception type if
+        any of the input module objects was involved in any of the
+        current exception's tracebacks. The aim is to enter exception
+        handling based on module by calling this class in an ``except``
+        clause. If there are no input modules passed in, this is a
+        length-zero tuple.
+
+        When there is no current exception, and no input modules, this
+        is a length-zero tuple. Otherwise, this is a variable length
+        tuple of the distinct exception types raised by the one or more
+        input module objects. This behavior can be used to construct
+        exception groups.
         """
         logger.debug("ExceptionFrom.__init__: enter")
         exc_typ, exc_val, _ = sys.exc_info()
@@ -58,7 +85,7 @@ class ExceptionFrom(tuple):
 
         Return a tuple of distinct exception classes found in the
         calling module. This classmethod searches the module's AST
-        for `raise` statements, extracts their exception class, and
+        for ``raise`` statements, extracts their exception class, and
         adds them to an internal set. After the search, the set is cast
         to an exception tuple and returned.
         """
@@ -73,7 +100,11 @@ class ExceptionFrom(tuple):
 
 
 def get_raised(*modules: ModuleType) -> tuple:
-    """return tuple"""
+    """return tuple
+    
+    :param *modules: one or more input modules
+    
+    """
     logger.debug("get_raised: enter")
     exceptions = set()
     for module in modules:
@@ -114,7 +145,13 @@ def evaluate_implicated(
     target_modules: tuple[ModuleType],
     root_only: bool=True
 ) -> bool:
-    """return bool"""
+    """return bool
+    
+    :param involved_modules: tuple of modules involved in the exception
+    :param target_modules: tuple of target modules
+    :param root_only: flag to tune target module qualification
+    
+    """
     logger.debug("evaluate_implicated: enter")
     if not involved_modules:
         return False
@@ -129,7 +166,12 @@ def evaluate_implicated(
 
 
 def get_modules(exception: BaseException, **search_kwargs) -> tuple:
-    """return tuple"""
+    """return tuple
+    
+    :param exception: exception object to extract modules from
+    :param **search_kwargs: optional keyword arguments
+    
+    """
     logger.debug("get_modules: enter")
     ensure_exists = search_kwargs.get("ensure_exists", True)
     search_space = search_kwargs.get("search_space", (sys.modules, globals()))
@@ -145,7 +187,11 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple:
 
 
 def get_code_filenames(exception: BaseException) -> tuple:
-    """return tuple"""
+    """return tuple
+    
+    :param exception: exception object to extract filenames from
+    
+    """
     logger.debug("get_code_filenames: enter")
     result = list()
     for traceback in get_tracebacks(exception):
@@ -154,7 +200,11 @@ def get_code_filenames(exception: BaseException) -> tuple:
 
 
 def get_tracebacks(exception: BaseException) -> tuple:
-    """return tuple"""
+    """return tuple
+    
+    :param exception: exception object to extract tracebacks from
+
+    """
     logger.debug("get_tracebacks: enter")
     result = list()
     traceback = exception.__exception__
