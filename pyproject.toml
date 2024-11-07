@@ -13,8 +13,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3"
 ]
-description = "Additional exception handling mechanisms"
-version = "2024.1"
+description = "Exception handling mechanisms"
 license = {file = "LICENSE.md"}
 maintainers = [
     {name = "Will Fatherley", email = "wfatherley@proton.me"}
@@ -22,6 +21,7 @@ maintainers = [
 name = "exceptlib"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.9"
+version = "2024.1"
 
 
 [project.urls]
