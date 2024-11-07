@@ -32,6 +32,7 @@ class ExceptionFrom(tuple):
         :param *target_modules: sequence of module objects
         :param **kwargs: optional keyword arguments
         
+
         """
         logger.debug("ExceptionFrom.__init__: enter")
         exc_typ, exc_val, _ = sys.exc_info()
@@ -104,8 +105,8 @@ def get_raised(*modules: ModuleType) -> tuple:
             # add the exception to exception set
             exceptions.add(eval(name_id))
 
-        # instantiate and return exception tuple
-        return tuple(exceptions)
+    # instantiate and return exception tuple
+    return tuple(exceptions)
     
 
 def evaluate_implicated(
