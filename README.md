@@ -41,10 +41,11 @@ except TypeError:
 
 In the `try` block above, three calls are made with the last raising `TypeError`. When working to find a handler for this exception, the interpreter begins sequentially traversing the `except` blocks that follow, looking for the first one that specifies `TyperError`. The first `except` block is set up to handle any exception arising from `statistics` or `urllib`, and is not entered since neither module raised. Because the current exception is not an instance of `IndexError`, the second `except` block is not enetered either. Since the error came from `re`, the third `except` block is entered. And since the third is entered, the last `except` block is not entered despite indicating `TypeError`.
 
-While this example is contrived for demonstration, the utility of `exceptlib.ExceptionFrom` spans program flexibility and development operations:
+While this concrete example is contrived for demonstration, the utility of `exceptlib.ExceptionFrom` spans program flexibility and development operations:
 
  - enable certain retries and fallbacks during exception handling with less boilerplate;
- - enhance regression or performance testing facilities for 3rd party libraries.
+ - enhance regression or performance testing facilities for 3rd party libraries;
+ - widen the scope of `except` clauses.
 
 In addition to its functionality as the predicate of `except` statments, `exceptlib.ExceptionFrom` provides additional introspective functionality through a class method and its constructor:
 
@@ -54,11 +55,11 @@ import re, urllib
 # a tuple of distinct exceptions raised in this source file
 these_exc_tuple = ExceptionFrom.here()
 
-# a tuple of exceptions raised by the input module sources
+# a tuple of distinct exceptions raised by the input modules
 exc_tuple = ExceptionFrom(re, urllib)
 ```
 
-The `ExceptionFrom.here` class method is useful to scrape exceptions from a containing module, possibly for use in defining exception groups for example. Calling `ExceptionFrom` when there is no current exception will direct its constructor to scrape exceptions from the specified modules.
+The `ExceptionFrom.here` class method is useful to scrape exceptions from a containing module, possibly for use in defining exception groups for example. Calling `ExceptionFrom` when there is no current exception will direct its constructor to scrape distinct exceptions from the specified modules.
 
 ## Install
 This library is available through [PyPI](https://pypi.org/project/exceptlib/) and [GitHub](https://github.com/wfatherley/exceptlib).

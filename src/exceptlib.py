@@ -70,16 +70,24 @@ class ExceptionFrom(tuple):
         """
         logger.debug("ExceptionFrom.__init__: enter")
         exc_typ, exc_val, _ = sys.exc_info()
+
+        # enter assume handling exception by module
         if exc_typ is not None:
             target_is_involved = evaluate_implicated(
                 get_modules(exc_val),
                 target_modules,
                 root_only=kwargs.get("root_only", True)
             )
+
+            # set self to a tuple with the current exception
             if target_is_involved:
                 super().__init__((exc_typ,))
+            
+            # or impossible exception target module(s) not involved
             else:
-                super().__init__((NotThisException,))
+                super().__init__((random_exception(),))
+
+        # or enter scraping functionality if no current exception
         else:
             super().__init__(get_raised(*target_modules))
     
@@ -226,9 +234,13 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
     # name search keyword arguments for clarity
     ensure_exists = search_kwargs.get("ensure_exists", True)
     search_space = search_kwargs.get("search_space", (sys.modules, globals()))
+
+    # loop over code filenames found in each traceback of exception
     result = list()
     for filename in get_code_filenames(exception):
         for search_space_item in search_space:
+
+            # search for modules by filename in search spaces
             result.append(
                 modules_from_filename(
                     filename, search_space_item, ensure_exists=ensure_exists
@@ -282,6 +294,8 @@ def get_code_filenames(exception: BaseException) -> tuple[str]:
     """
     logger.debug("get_code_filenames: enter")
     result = list()
+
+    # use canonical loop instead of comprehension for readibility
     for traceback in get_tracebacks(exception):
         result.append(traceback.tb_frame.f_code.co_filename)
     return tuple(result)
@@ -297,8 +311,12 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
     """
     logger.debug("get_tracebacks: enter")
     result = list()
-    traceback = exception.__exception__
+
+    # bind first exception and begin loop if not none
+    traceback = exception.__traceback__
     while traceback is not None:
+
+        # append at first in loop then rebind to next traceback
         result.append(traceback)
         traceback = traceback.tb_next
     return tuple(result)
