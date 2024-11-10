@@ -69,7 +69,7 @@ class ExceptionFrom(tuple):
         exception groups.
         """
         logger.debug("ExceptionFrom.__init__: enter")
-        print("hi")
+        
         # handle edge cases
         if __builtins__ in target_modules:
             logger.exception("ExceptionFrom.__init__: __builtins__ passed")
@@ -78,7 +78,7 @@ class ExceptionFrom(tuple):
         # enter assume handling exception by module
         exc_typ, exc_val, _ = sys.exc_info()
         if exc_typ is not None:
-            print("hi")
+            
             target_is_involved = evaluate_implicated(
                 get_modules(exc_val),
                 target_modules,
@@ -95,7 +95,6 @@ class ExceptionFrom(tuple):
 
         # or enter scraping functionality if no current exception
         else:
-            print("hi")
             super().__init__(get_raised(*target_modules))
     
     @classmethod
