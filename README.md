@@ -12,10 +12,10 @@ This experimental library extends Python's exception handling mechanism with two
  - handling exceptions by module object;
  - and exception class scraping from module objects.
 
-As this library is actively being developed, there are plans to add additional features aimed at profiling exceptions.
+This library is under active development; there are plans to add additional features.
 
 ## Usage notes
-The main feature `exceptlib` is handling exceptions by module. For example:
+The main feature of `exceptlib` is handling exceptions by module. This is acheived with its `ExceptionFrom` class. For example:
 
 ```python
 import re

@@ -69,10 +69,16 @@ class ExceptionFrom(tuple):
         exception groups.
         """
         logger.debug("ExceptionFrom.__init__: enter")
-        exc_typ, exc_val, _ = sys.exc_info()
+        print("hi")
+        # handle edge cases
+        if __builtins__ in target_modules:
+            logger.exception("ExceptionFrom.__init__: __builtins__ passed")
+            raise ValueError("can't handle __builtins__")
 
         # enter assume handling exception by module
+        exc_typ, exc_val, _ = sys.exc_info()
         if exc_typ is not None:
+            print("hi")
             target_is_involved = evaluate_implicated(
                 get_modules(exc_val),
                 target_modules,
@@ -89,6 +95,7 @@ class ExceptionFrom(tuple):
 
         # or enter scraping functionality if no current exception
         else:
+            print("hi")
             super().__init__(get_raised(*target_modules))
     
     @classmethod
@@ -137,6 +144,7 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
 
     # search in all input module objects
     for module in modules:
+        module_dir = dir(module)
 
         # using ast.walk as traversal
         module_source = Path(inspect.getfile(module)).read_text()
@@ -164,7 +172,10 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
                     name_id = node.exc.func.value.id
 
             # add the exception to exception set
-            exceptions.add(eval(name_id))
+            if name_id in module_dir:
+                exceptions.add(getattr(module, name_id))
+            else:
+                 exceptions.add(eval(name_id))
 
     # instantiate and return exception tuple
     return tuple(exceptions)
