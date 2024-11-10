@@ -144,7 +144,6 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
 
     # search in all input module objects
     for module in modules:
-        module_dir = dir(module)
 
         # using ast.walk as traversal
         module_source = Path(inspect.getfile(module)).read_text()
@@ -172,8 +171,8 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
                     name_id = node.exc.func.value.id
 
             # add the exception to exception set
-            if name_id in module_dir:
-                exceptions.add(getattr(module, name_id))
+            if (exception_type := getattr(module, name_id, None)) is not None:
+                exceptions.add(exception_type)
             else:
                  exceptions.add(eval(name_id))
 
