@@ -39,10 +39,10 @@ class NotThisException(BaseException):
 
 
 class ExceptionFrom(tuple):
-    """exception from tuple"""
+    """exception from container"""
 
-    def __init__(self, *target_modules: ModuleType, **kwargs) -> None:
-        """return None
+    def __new__(cls, *target_modules: ModuleType, **kwargs) -> tuple:
+        """return tuple
         
         :param *target_modules: sequence of module objects
         :param **kwargs: optional keyword arguments
@@ -78,7 +78,7 @@ class ExceptionFrom(tuple):
         # enter assume handling exception by module
         exc_typ, exc_val, _ = sys.exc_info()
         if exc_typ is not None:
-            
+            print(get_modules(exc_val))
             target_is_involved = evaluate_implicated(
                 get_modules(exc_val),
                 target_modules,
@@ -87,15 +87,15 @@ class ExceptionFrom(tuple):
 
             # set self to a tuple with the current exception
             if target_is_involved:
-                super().__init__((exc_typ,))
+                return tuple.__new__(cls, (exc_typ,))
             
             # or impossible exception target module(s) not involved
             else:
-                super().__init__((random_exception(),))
+                return tuple.__new__(cls, (random_exception(),))
 
         # or enter scraping functionality if no current exception
         else:
-            super().__init__(get_raised(*target_modules))
+            return tuple.__new__(cls, get_raised(*target_modules))
     
     @classmethod
     def here(cls, *exclude: BaseException, **kwargs) -> Tuple[BaseException]:
@@ -250,15 +250,17 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
         for search_space_item in search_space:
 
             # search for modules by filename in search spaces
-            result.append(
-                modules_from_filename(
+            modules = get_modules_from_filename(
                     filename, search_space_item, ensure_exists=ensure_exists
                 )
-            )
+            if modules:
+                result.append(modules)
+
+    # recast and return result
     return tuple(result)
 
 
-def modules_from_filename(
+def get_modules_from_filename(
     file_name: str, search_space: dict, ensure_exists: bool=True
 ) -> tuple[ModuleType]:
     """return tuple[ModuleType]
