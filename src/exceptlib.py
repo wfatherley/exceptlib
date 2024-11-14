@@ -38,6 +38,9 @@ class NotThisException(BaseException):
         raise Exception("subclassing not recommended")
 
 
+type ExcInfoType = tuple[BaseException, BaseException, TracebackType]
+
+
 class ExceptionFrom(tuple):
     """exception from container"""
 
@@ -331,4 +334,36 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
         # append at first in loop then rebind to next traceback
         result.append(traceback)
         traceback = traceback.tb_next
+    return tuple(result)
+        
+
+def get_exception_chain(
+    exception_obj: ExcInfoType | BaseException, earliest_first: bool=True
+) -> tuple[BaseException]:
+    """return tuple[BaseException]
+    
+    :param exception_obj: ``exc_info`` triple or exception instance
+    :param earliest_first: boolean sorting flag
+
+    Accept a ``sys.exc_info``-like triple or an exception instance, and
+    accumulate it and any chained exceptions. Return a tuple of these
+    exceptions in earliest-to-latest order by default. Set
+    ``earliest_first`` to ``False` to return in latest-to-earliest
+    order.
+    """
+    logger.debug("get_exception_chain: enter")
+
+    # extract exception instance from exc_info triple and append
+    if isinstance(exception_obj, tuple):
+        exception_obj = exception_obj[1]
+    result = [exception_obj]
+
+    # get any other chained exceptions
+    while exception_obj.__context__ is not None:
+        result.append(exception_obj.__context__)
+        exception_obj = exception_obj.__context__
+
+    # maybe reverse and then return
+    if earliest_first:
+        result.reverse()
     return tuple(result)
