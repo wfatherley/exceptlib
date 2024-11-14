@@ -9,8 +9,8 @@ from pathlib import Path
 from random import sample
 from string import ascii_letters
 from types import ModuleType, TracebackType
-from typing import Tuple
 
+from collections.abc import Sequence
 from importlib.util import module_from_spec, spec_from_file_location
 
 
@@ -47,7 +47,7 @@ class ExceptionFrom(tuple):
         :param *target_modules: sequence of module objects
         :param **kwargs: optional keyword arguments
         
-        Construct self, a tuple of zero or more exception types. The
+        Construct class, a tuple of zero or more exception types. The
         elements in this tuple depend on two factors-- if the thread
         has a current exception and which module objects are passed in.
 
@@ -97,8 +97,8 @@ class ExceptionFrom(tuple):
             return tuple.__new__(cls, get_raised(*target_modules))
     
     @classmethod
-    def here(cls, *exclude: BaseException, **kwargs) -> Tuple[BaseException]:
-        """return Tuple[BaseException]
+    def here(cls, *exclude: BaseException, **kwargs) -> tuple[BaseException]:
+        """return tuple[BaseException]
         
         :param *exclude: zero or more exception objects
         :param **kwargs: zero or more configuration arguments
@@ -241,7 +241,9 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
 
     # unpack search keyword arguments for clarity
     ensure_exists = search_kwargs.get("ensure_exists", True)
-    search_space = search_kwargs.get("search_space", (sys.modules, globals()))
+    search_space = search_kwargs.get(
+        "search_space", (sys.modules.values(), globals().values())
+    )
 
     # loop over code filenames found in each traceback of exception
     result = list()
@@ -260,7 +262,7 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
 
 
 def get_modules_from_filename(
-    file_name: str, search_space: dict, ensure_exists: bool=True
+    file_name: str, search_space: Sequence, ensure_exists: bool=True
 ) -> tuple[ModuleType]:
     """return tuple[ModuleType]
     
@@ -285,7 +287,7 @@ def get_modules_from_filename(
 
     # look for and return matches
     matches = list()
-    for value in search_space.values():
+    for value in search_space:
         if getattr(value, "__file__", None) == file_name:
             logger.debug("mod_from_filename: mod=%s", value.__name__)
             if isinstance(value, ModuleType):
