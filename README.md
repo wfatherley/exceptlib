@@ -39,7 +39,12 @@ except TypeError:
     print("it was a type error")              # no print
 ```
 
-In the `try` block above, three calls are made with the last raising `TypeError`. When working to find a handler for this exception, the interpreter begins sequentially traversing the `except` blocks that follow, looking for the first one that specifies `TyperError`. The first `except` block is set up to handle any exception arising from `statistics` or `urllib`, and is not entered since neither module raised. Because the current exception is not an instance of `IndexError`, the second `except` block is not enetered either. Since the error came from `re`, the third `except` block is entered. And since the third is entered, the last `except` block is not entered despite indicating `TypeError`.
+In the `try` block above, three calls are made with the last raising `TypeError`. When working to find a handler for this exception, the interpreter begins sequentially traversing the `except` blocks that follow, looking for the first one that specifies `TyperError`.
+
+ - The first `except` block is set up to handle any exception arising from `statistics` or `urllib`, and is not entered since neither module raised;
+ - because the current exception is not an instance of `IndexError`, the second `except` block is not enetered either;
+ - since the error came from `re`, the third `except` block is entered;
+ - and since the third is entered, the last `except` block is not entered despite indicating `TypeError`.
 
 While this concrete example is contrived for demonstration, the utility of `exceptlib.ExceptionFrom` spans program flexibility and development operations:
 

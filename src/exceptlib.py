@@ -79,21 +79,21 @@ class ExceptionFrom(tuple):
             raise ValueError("can't handle __builtins__")
 
         # enter assume handling exception by module
-        exc_typ, exc_val, _ = sys.exc_info()
-        if exc_typ is not None:
+        exception_chain = get_exception_chain(sys.exc_info())
+        if exception_chain:
             target_is_involved = evaluate_implicated(
-                get_modules(exc_val),
+                get_modules(exception_chain[0]),
                 target_modules,
                 root_only=kwargs.get("root_only", True)
             )
 
             # set self to a tuple with the current exception
             if target_is_involved:
-                return tuple.__new__(cls, (exc_typ,))
+                return tuple.__new__(cls, (exception_chain[-1],))
             
             # or impossible exception target module(s) not involved
             else:
-                return tuple.__new__(cls, (random_exception(),))
+                return tuple.__new__(cls, (random_exception()(),))
 
         # or enter scraping functionality if no current exception
         else:
@@ -353,16 +353,23 @@ def get_exception_chain(
     """
     logger.debug("get_exception_chain: enter")
 
-    # extract exception instance from exc_info triple and append
+    # preprocess and initialize result containter
     if isinstance(exception_obj, tuple):
         exception_obj = exception_obj[1]
+    if exception_obj is None:
+        return tuple()
     result = [exception_obj]
 
     # get any other chained exceptions
-    while exception_obj.__context__ is not None:
-        result.append(exception_obj.__context__)
-        exception_obj = exception_obj.__context__
-
+    while True:
+        if exception_obj.__cause__ is not None:
+            exception_obj = exception_obj.__cause__
+        elif exception_obj.__context__ is not None:
+            exception_obj = exception_obj.__context__
+        else:
+            break
+        result.append(exception_obj)
+        
     # maybe reverse and then return
     if earliest_first:
         result.reverse()
