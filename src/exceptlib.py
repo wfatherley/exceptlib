@@ -78,7 +78,6 @@ class ExceptionFrom(tuple):
         # enter assume handling exception by module
         exc_typ, exc_val, _ = sys.exc_info()
         if exc_typ is not None:
-            print(get_modules(exc_val))
             target_is_involved = evaluate_implicated(
                 get_modules(exc_val),
                 target_modules,
@@ -240,7 +239,7 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
     """
     logger.debug("get_modules: enter")
 
-    # name search keyword arguments for clarity
+    # unpack search keyword arguments for clarity
     ensure_exists = search_kwargs.get("ensure_exists", True)
     search_space = search_kwargs.get("search_space", (sys.modules, globals()))
 
