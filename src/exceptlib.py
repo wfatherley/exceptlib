@@ -38,13 +38,15 @@ class NotThisException(BaseException):
         raise Exception("subclassing not recommended")
 
 
-type ExcInfoType = tuple[BaseException, BaseException, TracebackType]
+type ExcInfoType = tuple[
+    BaseException | None, BaseException | None, TracebackType | None
+]
 
 
 class ExceptionFrom(tuple):
     """exception from container"""
 
-    def __new__(cls, *target_modules: ModuleType, **kwargs) -> tuple:
+    def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
         """return tuple
         
         :param *target_modules: sequence of module objects
@@ -87,11 +89,11 @@ class ExceptionFrom(tuple):
                 root_only=kwargs.get("root_only", True)
             )
 
-            # set self to a tuple with the current exception
+            # set class to a tuple with the current exception
             if target_is_involved:
                 return tuple.__new__(cls, (exception_chain[-1],))
             
-            # or impossible exception target module(s) not involved
+            # or impossible exception if target module(s) not involved
             else:
                 return tuple.__new__(cls, (random_exception()(),))
 
@@ -354,7 +356,7 @@ def get_exception_chain(
     logger.debug("get_exception_chain: enter")
 
     # preprocess and initialize result containter
-    if isinstance(exception_obj, tuple):
+    if isinstance(exception_obj, ExcInfoType):
         exception_obj = exception_obj[1]
     if exception_obj is None:
         return tuple()
