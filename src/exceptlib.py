@@ -356,18 +356,25 @@ def get_exception_chain(
     logger.debug("get_exception_chain: enter")
 
     # preprocess and initialize result containter
-    if isinstance(exception_obj, ExcInfoType):
+    if isinstance(exception_obj, tuple) and len(exception_obj) == 3:
         exception_obj = exception_obj[1]
-    if exception_obj is None:
-        return tuple()
+    if not isinstance(exception_obj, BaseException):
+        raise ValueError("input not an exception or exc_info tuple")
     result = [exception_obj]
 
     # get any other chained exceptions
     while True:
+
+        # enter if: raise new_exc from original_exc
         if exception_obj.__cause__ is not None:
             exception_obj = exception_obj.__cause__
+
+        # enter if: raised without from keyword during original_exc
+        #           or with from None
         elif exception_obj.__context__ is not None:
             exception_obj = exception_obj.__context__
+
+        # break if no chain or end of chain and maybe append
         else:
             break
         result.append(exception_obj)
