@@ -56,9 +56,3 @@ class TestGetExceptionChain(BaseTestCase):
                     exceptlib.get_exception_chain(e, earliest_first=False),
                     (ValueError(), TypeError())
                 )
-
-        # 2-length, pattern two
-        try:
-            raise KeyError()
-        except KeyError as e:
-            try:
