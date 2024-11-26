@@ -9,6 +9,7 @@ from pathlib import Path
 from random import sample
 from string import ascii_letters
 from types import ModuleType, TracebackType
+from typing import Any
 
 from collections.abc import Sequence
 from importlib.util import module_from_spec, spec_from_file_location
@@ -356,7 +357,7 @@ def get_exception_chain(
     logger.debug("get_exception_chain: enter")
 
     # preprocess and initialize result containter
-    if isinstance(exception_obj, tuple) and len(exception_obj) == 3:
+    if is_hot_exc_info(exception_obj):
         exception_obj = exception_obj[1]
     if not isinstance(exception_obj, BaseException):
         raise ValueError("input not an exception or exc_info tuple")
@@ -383,3 +384,12 @@ def get_exception_chain(
     if earliest_first:
         result.reverse()
     return tuple(result)
+
+
+def is_hot_exc_info(obj: Any) -> bool:
+    """return bool"""
+    logger.debug("is_exc_info: enter")
+    if isinstance(obj, tuple) and len(obj) == 3:
+        if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
+            return True
+    return False
