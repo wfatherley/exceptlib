@@ -18,13 +18,21 @@ from importlib.util import module_from_spec, spec_from_file_location
 logger = getLogger(__name__)
 
 
+type ExcInfoType = tuple[
+    BaseException | None, BaseException | None, TracebackType | None
+]
+
+
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
     """return BaseException
     
-    :param name: subclass name string
+    :param name: optional subclass name string
     :param **attributes: a mapping of attributes and methods
 
-    Dynamically create and return a ``BaseException`` subclass.
+    Dynamically create and return a ``BaseException`` subclass. When
+    called without parameter ``name``, the returned subclass will
+    have a random 15-character (alpha only) name. Without any
+    keyword arguments, it will inheret ``BaseException.__dict__``.
     """
     logger.debug("random_exception: enter")
     name = name or "".join(sample(ascii_letters, 15))
@@ -32,20 +40,29 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
 
 
 class NotThisException(BaseException):
-    """not this exception"""
+    """not this exception
+    
+    This ``BaseException`` subclass exists to support the need for a
+    an exception that cannot happen during runtime. In this way, its
+    similar to the return value of ``random_exception``, but doesn't
+    involve dynamic class creation.
+    """
 
     def __init_subclass__(cls) -> None:
         """return None"""
         raise Exception("subclassing not recommended")
 
 
-type ExcInfoType = tuple[
-    BaseException | None, BaseException | None, TracebackType | None
-]
-
-
 class ExceptionFrom(tuple):
-    """exception from container"""
+    """exception from
+    
+    This `tuple` subclass is designed to be the predicate of an
+    ``except`` clause. Rather than containing elements of type
+    ``BaseException``, this object contains elements of type
+    ``types.ModuleType``. The functionality during exception
+    handling events is therefore to handle the current exception by
+    module.
+    """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
         """return tuple
@@ -387,7 +404,13 @@ def get_exception_chain(
 
 
 def is_hot_exc_info(obj: Any) -> bool:
-    """return bool"""
+    """return bool
+    
+    :param obj: object to inspect
+    
+    Accept any object and determine if it is a triple, along the lines
+    of what ``sys.exc_info`` returns.
+    """
     logger.debug("is_exc_info: enter")
     if isinstance(obj, tuple) and len(obj) == 3:
         if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
