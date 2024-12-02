@@ -229,14 +229,15 @@ def evaluate_implicated(
     
     # when concern is about the root module that raised is a target
     if root_only:
-        if not set(involved_modules[-1]).isdisjoint(set(target_modules)):
-            return True
+        involved_modules = involved_modules[-1]
         
     # when concern that any target was involved in the raising
     else:
         involved_modules = reduce(lambda x,y: x + y, involved_modules)
-        if not set(involved_modules).isdisjoint(set(target_modules)):
-            return True
+        
+    # return result
+    if not set(involved_modules).isdisjoint(set(target_modules)):
+        return True
     return False
 
 
@@ -305,8 +306,8 @@ def get_modules_from_filename(
 
     # ensure file_name refers to existing file
     if ensure_exists and not Path(file_name).exists():
-        logger.debug("mod_from_filename: file not found")
-        return tuple()
+        logger.error("mod_from_filename: DNE; file_name=%s", file_name)
+        raise ValueError("module file name DNE: %s", file_name)
 
     # look for and return matches
     matches = list()
@@ -346,6 +347,12 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
     """
     logger.debug("get_tracebacks: enter")
     result = list()
+
+    if not isinstance(exception, BaseException):
+        logger.error(
+            "get_tracebacks: not an exception; exception=%s", exception
+        )
+        raise ValueError("input not of type BaseException")
 
     # bind first exception and begin loop if not none
     traceback = exception.__traceback__

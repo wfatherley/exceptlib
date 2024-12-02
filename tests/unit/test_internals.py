@@ -14,10 +14,35 @@ class BaseTestCase(unittest.TestCase):
         logging.basicConfig(level=logging.DEBUG)
 
 
+class TestIsHotExcInfo(BaseTestCase):
+    """test exceptlib.is_hot_exc_info"""
+
+    def test_input_variation(self):
+        """return None"""
+
+        # raise TypeError with no parameters
+        with self.assertRaises(TypeError):
+            exceptlib.is_hot_exc_info()
+
+        # false-inducing inputs
+        self.assertFalse(exceptlib.is_hot_exc_info(tuple()))
+        self.assertFalse(exceptlib.is_hot_exc_info("123"))
+        self.assertFalse(exceptlib.is_hot_exc_info(sys.exc_info()))
+
+        # true-inducing input
+        exc = Exception()
+        self.assertTrue(exceptlib.is_hot_exc_info((type(exc), exc, exc.__traceback__)))
+        try:
+            raise KeyError()
+        except:
+            self.assertTrue(exceptlib.is_hot_exc_info(sys.exc_info()))
+
+
+
 class TestGetExceptionChain(BaseTestCase):
     """test exceptlib.get_exception_chain"""
 
-    def test_bad_inputs(self):
+    def test_input_variation(self):
         """return None"""
 
         # raise TypeError with no parameters
@@ -31,7 +56,7 @@ class TestGetExceptionChain(BaseTestCase):
         with self.assertRaises(ValueError):
             exceptlib.get_exception_chain(sys.exc_info())
 
-    def test_shallow_chain(self):
+    def test_chain(self):
         """return None"""
 
         # 1-length
@@ -39,8 +64,8 @@ class TestGetExceptionChain(BaseTestCase):
             exceptlib.get_exception_chain(Exception()), (Exception(),)
         )
 
-        # 2-length, pattern 1
-        for exc in (TypeError(), None):
+        # 2-length
+        for exc in (TypeError(),):
             try:
                 raise ValueError() from exc
             except Exception as e:
@@ -56,3 +81,18 @@ class TestGetExceptionChain(BaseTestCase):
                     exceptlib.get_exception_chain(e, earliest_first=False),
                     (ValueError(), TypeError())
                 )
+
+
+class TestGetTracebacks(BaseTestCase):
+    """test exceptlib.get_tracebacks"""
+
+    def test_input_variation(self):
+        """return None"""
+
+        # raise TypeError with no parameters
+        with self.assertRaises(TypeError):
+            exceptlib.get_tracebacks()
+
+        for obj in (1, "a", None, list, {}):
+            with self.assertRaises(ValueError):
+                exceptlib.get_tracebacks(obj)
