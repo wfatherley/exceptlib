@@ -18,9 +18,7 @@ This library is under active development; it may require additional tuning and t
 The main feature of `exceptlib` is handling exceptions by module through the `ExceptionFrom` class. For example:
 
 ```python
-import re
-import statistics
-import urllib
+import re, statistics, urllib
 
 from exceptlib import ExceptionFrom
 

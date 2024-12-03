@@ -1,9 +1,8 @@
-"""exceptlib"""
+"""Exception handling tools."""
 import ast
 import inspect
 import sys
 
-from _frozen_importlib import BuiltinImporter
 from functools import reduce
 from logging import getLogger
 from pathlib import Path
@@ -25,7 +24,7 @@ type ExcInfoType = tuple[
 
 
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
-    """return BaseException
+    """:return BaseException:
     
     :param name: optional subclass name string
     :param **attributes: a mapping of attributes and methods
@@ -41,7 +40,7 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
 
 
 class NotThisException(BaseException):
-    """not this exception
+    """A sentinal-like exception class.
     
     This ``BaseException`` subclass exists to support the need for a
     an exception that cannot happen during runtime. In this way, its
@@ -50,12 +49,12 @@ class NotThisException(BaseException):
     """
 
     def __init_subclass__(cls) -> None:
-        """return None"""
+        """:return None:"""
         raise Exception("subclassing not recommended")
 
 
 class ExceptionFrom(tuple):
-    """exception from
+    """A tuple subclass for use in exception handling.
     
     This `tuple` subclass is designed to be the predicate of an
     ``except`` clause. Rather than containing elements of type
@@ -66,7 +65,7 @@ class ExceptionFrom(tuple):
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
-        """return tuple
+        """:return tuple:
         
         :param *target_modules: sequence of module objects
         :param **kwargs: optional keyword arguments
@@ -117,7 +116,7 @@ class ExceptionFrom(tuple):
     
     @classmethod
     def here(cls, *exclude: BaseException, **kwargs) -> tuple[BaseException]:
-        """return tuple[BaseException]
+        """:return tuple[BaseException]:
         
         :param *exclude: zero or more exception objects
         :param **kwargs: zero or more configuration arguments
@@ -146,7 +145,7 @@ class ExceptionFrom(tuple):
 
 
 def get_raised(*modules: ModuleType) -> tuple[BaseException]:
-    """return tuple[BaseException]
+    """:return tuple[BaseException]:
     
     :param *modules: one or more input modules
     
@@ -207,7 +206,7 @@ def evaluate_implicated(
     target_modules: tuple[ModuleType],
     root_only: bool=True
 ) -> bool:
-    """return bool
+    """:return bool:
     
     :param involved_modules: tuple of modules involved in the exception
     :param target_modules: tuple of target modules
@@ -243,7 +242,7 @@ def evaluate_implicated(
 
 
 def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
-    """return tuple[tuple]
+    """:return tuple[tuple]:
     
     :param exception: exception object to extract modules from
     :param **search_kwargs: optional keyword arguments
@@ -289,7 +288,7 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
 def get_modules_from_filename(
     file_name: str, search_space: Sequence, ensure_exists: bool=True
 ) -> tuple[ModuleType]:
-    """return tuple[ModuleType]
+    """:return tuple[ModuleType]:
     
     :param file_name: file name string
     :param search_space: arbitrary mapping
@@ -323,7 +322,7 @@ def get_modules_from_filename(
 
 
 def get_code_filenames(exception: BaseException) -> tuple[str]:
-    """return tuple[str]
+    """:return tuple[str]:
     
     :param exception: exception object to extract filenames from
     
@@ -341,7 +340,7 @@ def get_code_filenames(exception: BaseException) -> tuple[str]:
 
 
 def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
-    """return tuple[TracebackType]
+    """:return tuple[TracebackType]:
     
     :param exception: exception object to extract tracebacks from
 
@@ -370,7 +369,7 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
 def get_exception_chain(
     exception_obj: ExcInfoType | BaseException, earliest_first: bool=True
 ) -> tuple[BaseException]:
-    """return tuple[BaseException]
+    """:return tuple[BaseException]:
     
     :param exception_obj: ``exc_info`` triple or exception instance
     :param earliest_first: boolean sorting flag
@@ -414,12 +413,13 @@ def get_exception_chain(
 
 
 def is_hot_exc_info(obj: Any) -> bool:
-    """return bool
+    """:return bool:
     
     :param obj: object to inspect
     
     Accept any object and determine if it is a triple, along the lines
-    of what ``sys.exc_info`` returns.
+    of what ``sys.exc_info`` returns when the interpreter is handling an
+    exception.
     """
     logger.debug("is_exc_info: enter")
     if isinstance(obj, tuple) and len(obj) == 3:
