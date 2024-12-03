@@ -3,6 +3,7 @@ import ast
 import inspect
 import sys
 
+from _frozen_importlib import BuiltinImporter
 from functools import reduce
 from logging import getLogger
 from pathlib import Path
@@ -92,11 +93,6 @@ class ExceptionFrom(tuple):
         exception groups.
         """
         logger.debug("ExceptionFrom.__init__: enter")
-        
-        # handle edge cases
-        if __builtins__ in target_modules:
-            logger.exception("ExceptionFrom.__init__: __builtins__ passed")
-            raise ValueError("can't handle __builtins__")
 
         # enter assume handling exception by module
         exception_chain = get_exception_chain(sys.exc_info())
@@ -159,6 +155,11 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
     distinct exception types found.
     """
     logger.debug("get_raised: enter")
+
+    # don't handle builtin modules
+    if any(m.__name__ in sys.builtin_module_names for m in modules):
+        logger.error("get_raised: encountered builtin; modules=%s", modules)
+        raise ValueError("builtin modules are not currently supported")
 
     # ensure result contains distinct exception types
     exceptions = set()
@@ -306,8 +307,10 @@ def get_modules_from_filename(
 
     # ensure file_name refers to existing file
     if ensure_exists and not Path(file_name).exists():
-        logger.error("mod_from_filename: DNE; file_name=%s", file_name)
-        raise ValueError("module file name DNE: %s", file_name)
+        logger.error(
+            "mod_from_filename: DNE or is builtin; file_name=%s", file_name
+        )
+        raise ValueError("module file name DNE, possible builtin")
 
     # look for and return matches
     matches = list()
