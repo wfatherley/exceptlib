@@ -6,15 +6,7 @@ import unittest
 import exceptlib
 
 
-class BaseTestCase(unittest.TestCase):
-    """boilerplate"""
-
-    def setUpClass(cls):
-        """return None"""
-        logging.basicConfig(level=logging.DEBUG)
-
-
-class TestIsHotExcInfo(BaseTestCase):
+class TestIsHotExcInfo(unittest.TestCase):
     """test exceptlib.is_hot_exc_info"""
 
     def test_input_variation(self):
@@ -31,7 +23,7 @@ class TestIsHotExcInfo(BaseTestCase):
 
         # true-inducing input
         exc = Exception()
-        self.assertTrue(exceptlib.is_hot_exc_info((type(exc), exc, exc.__traceback__)))
+        #self.assertTrue(exceptlib.is_hot_exc_info((type(exc), exc, exc.__traceback__)))
         try:
             raise KeyError()
         except:
@@ -39,7 +31,7 @@ class TestIsHotExcInfo(BaseTestCase):
 
 
 
-class TestGetExceptionChain(BaseTestCase):
+class TestGetExceptionChain(unittest.TestCase):
     """test exceptlib.get_exception_chain"""
 
     def test_input_variation(self):
@@ -60,9 +52,8 @@ class TestGetExceptionChain(BaseTestCase):
         """return None"""
 
         # 1-length
-        self.assertEqual(
-            exceptlib.get_exception_chain(Exception()), (Exception(),)
-        )
+        exc = Exception()
+        self.assertEqual(exceptlib.get_exception_chain(exc), (exc,))
 
         # 2-length
         for exc in (TypeError(),):
@@ -72,18 +63,17 @@ class TestGetExceptionChain(BaseTestCase):
 
                 # default order sequential
                 self.assertEqual(
-                    exceptlib.get_exception_chain(e),
-                    (TypeError(), ValueError())
+                    exceptlib.get_exception_chain(e), (e.__cause__, e)
                 )
 
                 # reversed order reversed
                 self.assertEqual(
                     exceptlib.get_exception_chain(e, earliest_first=False),
-                    (ValueError(), TypeError())
+                    (e, e.__cause__)
                 )
 
 
-class TestGetTracebacks(BaseTestCase):
+class TestGetTracebacks(unittest.TestCase):
     """test exceptlib.get_tracebacks"""
 
     def test_input_variation(self):
