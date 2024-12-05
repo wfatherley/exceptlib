@@ -1,5 +1,5 @@
 ``exceptlib`` API
-=============
+=================
 
 The following objects are available at ``exceptlib``'s top-level. This API is under active development and its structure may change.
 
