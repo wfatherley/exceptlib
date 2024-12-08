@@ -1,5 +1,4 @@
 """unit tests for exceptlib interals"""
-import logging
 import sys
 import unittest
 
