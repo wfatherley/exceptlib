@@ -26,11 +26,3 @@ version = "2024.1"
 
 [project.urls]
 repository = "https://github.com/wfatherley/exceptlib.git"
-
-
-[tool.setuptools]
-include-package-data = true
-
-
-[tool.setuptools.packages.find]
-where = ["src"]
