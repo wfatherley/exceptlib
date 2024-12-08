@@ -18,11 +18,6 @@ from importlib.util import module_from_spec, spec_from_file_location
 logger = getLogger(__name__)
 
 
-type ExcInfoType = tuple[
-    BaseException | None, BaseException | None, TracebackType | None
-]
-
-
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
     """:return BaseException:
     
@@ -50,7 +45,7 @@ class NotThisException(BaseException):
 
     def __init_subclass__(cls) -> None:
         """:return None:"""
-        raise Exception("subclassing not recommended")
+        raise TypeError("subclassing not recommended")
 
 
 class ExceptionFrom(tuple):
@@ -105,21 +100,19 @@ class ExceptionFrom(tuple):
             # set class to a tuple with the current exception
             if target_is_involved:
                 return tuple.__new__(cls, (exception_chain[-1],))
-            
+
             # or impossible exception if target module(s) not involved
-            else:
-                return tuple.__new__(cls, (random_exception()(),))
+            return tuple.__new__(cls, (random_exception()(),))
 
         # or enter scraping functionality if no current exception
         else:
             return tuple.__new__(cls, get_raised(*target_modules))
-    
+
     @classmethod
-    def here(cls, *exclude: BaseException, **kwargs) -> tuple[BaseException]:
+    def here(cls, *exclude: BaseException) -> tuple[BaseException]:
         """:return tuple[BaseException]:
         
         :param *exclude: zero or more exception objects
-        :param **kwargs: zero or more configuration arguments
 
         Return a tuple of distinct exception classes found in the
         calling module. This classmethod searches the module's AST
@@ -136,7 +129,7 @@ class ExceptionFrom(tuple):
         # return empty tuple when nothing to parse
         if not path_obj.exists():
             return cls()
-        
+
         # use a fresh module
         module = module_from_spec(
             spec_from_file_location(__name__, __file__)
@@ -144,10 +137,13 @@ class ExceptionFrom(tuple):
         return cls(e for e in get_raised(module) if e not in exclude)
 
 
-def get_raised(*modules: ModuleType) -> tuple[BaseException]:
+def get_raised(
+    *modules: ModuleType, file_encoding="utf-8"
+) -> tuple[BaseException]:
     """:return tuple[BaseException]:
     
     :param *modules: one or more input modules
+    :param file_encoding: string representing encoding of module files
     
     Accept zero or more module objects and scrape raise clauses from
     their ASTs, exctracting each exception type. Return a tuple of the
@@ -167,7 +163,7 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
     for module in modules:
 
         # using ast.walk as traversal
-        module_source = Path(inspect.getfile(module)).read_text()
+        module_source = Path(inspect.getfile(module)).read_text(file_encoding)
         for node in ast.walk(ast.parse(module_source)):
 
             # skip over non raise nodes
@@ -186,7 +182,7 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
 
                 # case when func is ast.Name
                 name_id = getattr(node.exc.func, "id", None)
-                
+
                 # case when func is ast.Attribute
                 if isinstance(node.exc.func, ast.Attribute):
                     name_id = node.exc.func.value.id
@@ -195,11 +191,11 @@ def get_raised(*modules: ModuleType) -> tuple[BaseException]:
             if (exception_type := getattr(module, name_id, None)) is not None:
                 exceptions.add(exception_type)
             else:
-                 exceptions.add(eval(name_id))
+                exceptions.add(eval(name_id))
 
     # instantiate and return exception tuple
     return tuple(exceptions)
-    
+
 
 def evaluate_implicated(
     involved_modules: tuple[ModuleType],
@@ -226,15 +222,15 @@ def evaluate_implicated(
     # when there is module proper that raised
     if not involved_modules:
         return False
-    
+
     # when concern is about the root module that raised is a target
     if root_only:
         involved_modules = involved_modules[-1]
-        
+
     # when concern that any target was involved in the raising
     else:
         involved_modules = reduce(lambda x,y: x + y, involved_modules)
-        
+
     # return result
     if not set(involved_modules).isdisjoint(set(target_modules)):
         return True
@@ -270,7 +266,7 @@ def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
     )
 
     # loop over code filenames found in each traceback of exception
-    result = list()
+    result = []
     for filename in get_code_filenames(exception):
         for search_space_item in search_space:
 
@@ -292,14 +288,15 @@ def get_modules_from_filename(
     
     :param file_name: file name string
     :param search_space: arbitrary mapping
+    :param ensure_exists: 
     
     Accept a filename and attempt to find it as a __file__ attribute of
     ModuleType values in a search space dictionary. Return a tuple
     whose elements are modules that match the input filename.
     
     By default, the input filename must exist for the search to be
-    performed; an empty list is returned when the it does not. To alter
-    this default behavior, set optional parameter ``ensure_exists`` to
+    performed; ``ValueError`` is raised if it does not. To alter this
+    default behavior, set optional parameter ``ensure_exists`` to
     ``False``.
     """
     logger.debug("mod_from_filename: enter; file_name=%s", file_name)
@@ -312,7 +309,7 @@ def get_modules_from_filename(
         raise ValueError("module file name DNE, possible builtin")
 
     # look for and return matches
-    matches = list()
+    matches = []
     for value in search_space:
         if getattr(value, "__file__", None) == file_name:
             logger.debug("mod_from_filename: mod=%s", value.__name__)
@@ -331,11 +328,15 @@ def get_code_filenames(exception: BaseException) -> tuple[str]:
     corresponding code object. Return the list as a tuple.
     """
     logger.debug("get_code_filenames: enter")
-    result = list()
+    result = []
 
-    # use canonical loop instead of comprehension for readibility
+    # extract code filename from all frames from all tracebacks
     for traceback in get_tracebacks(exception):
-        result.append(traceback.tb_frame.f_code.co_filename)
+        frame = traceback.tb_frame
+        while frame is not None:
+            result.append(frame.f_code.co_filename)
+            frame = frame.f_back
+
     return tuple(result)
 
 
@@ -348,7 +349,7 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
     traceback objects, ordered latest to earliest.
     """
     logger.debug("get_tracebacks: enter")
-    result = list()
+    result = []
 
     if not isinstance(exception, BaseException):
         logger.error(
@@ -364,10 +365,10 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
         result.append(traceback)
         traceback = traceback.tb_next
     return tuple(result)
-        
+
 
 def get_exception_chain(
-    exception_obj: ExcInfoType | BaseException, earliest_first: bool=True
+    exception_obj: tuple | BaseException, earliest_first: bool=True
 ) -> tuple[BaseException]:
     """:return tuple[BaseException]:
     
@@ -405,7 +406,7 @@ def get_exception_chain(
         else:
             break
         result.append(exception_obj)
-        
+
     # maybe reverse and then return
     if earliest_first:
         result.reverse()

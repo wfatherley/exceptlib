@@ -85,3 +85,19 @@ class TestGetTracebacks(unittest.TestCase):
         for obj in (1, "a", None, list, {}):
             with self.assertRaises(ValueError):
                 exceptlib.get_tracebacks(obj)
+
+
+class TestGetCodeFilenames(unittest.TestCase):
+    """test exceptlib.get_code_filenames"""
+
+    def test_input_variation(self):
+        """return None"""
+
+        # raise TypeError with no parameters
+        with self.assertRaises(TypeError):
+            exceptlib.get_code_filenames()
+
+        # raise ValueError with bad paramter
+        with self.assertRaises(ValueError):
+            exceptlib.get_code_filenames(7)
+
