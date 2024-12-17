@@ -11,7 +11,7 @@ from string import ascii_letters
 from types import ModuleType, TracebackType
 from typing import Any
 
-from collections.abc import Sequence
+from collections.abc import Sequence # pylint: disable=E0401
 from importlib.util import module_from_spec, spec_from_file_location
 
 
@@ -90,7 +90,7 @@ class ExceptionFrom(tuple):
 
         # enter assume handling exception by module
         exception_chain = get_exception_chain(sys.exc_info())
-        if exception_chain:
+        if exception_chain: # pylint: disable=R1705
             target_is_involved = evaluate_implicated(
                 get_modules(exception_chain[0]),
                 target_modules,
@@ -191,7 +191,7 @@ def get_raised(
             if (exception_type := getattr(module, name_id, None)) is not None:
                 exceptions.add(exception_type)
             else:
-                exceptions.add(eval(name_id))
+                exceptions.add(eval(name_id)) # pylint: disable=W0123
 
     # instantiate and return exception tuple
     return tuple(exceptions)
