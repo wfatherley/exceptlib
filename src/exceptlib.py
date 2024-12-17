@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 
 
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
-    """:return BaseException:
+    """:return BaseException: a ``BaseException`` subclass
     
     :param name: optional subclass name string
     :param **attributes: a mapping of attributes and methods
@@ -59,14 +59,14 @@ class ExceptionFrom(tuple):
     by exception or exception group. Input parameters are zero or more
     module objects.
 
-    When zero module objects are supplied, this object is always an
-    empty ``tuple``. When one or more module objects are supplied, this
-    object is a length-one tuple, with
+    If zero module objects are supplied, this object is always an empty
+    ``tuple``. If one or more module objects are supplied, this object
+    is a length-one tuple, with
 
      - the current exception as its sole element if any of the module \
     objects raised the exception;
      - a dynamically-created, "difficult to replicate" exception if \
-    none of the module obejcts raised the exception.
+    none of the module objects raised the exception.
     
     In other words, an ``except`` clause with a predicate of the
     form ``ExceptionFrom(mod1, mod2, ...)`` is entered only if one of
@@ -78,6 +78,13 @@ class ExceptionFrom(tuple):
     sole element of this object is the current except if one of the
     input module objects raised at any point in the current exception's
     chain.
+
+    When called in an expression assignment, this object acts to scrape
+    exception types raised in the module object sources. For example,
+    obtain a tuple of exception types raised in ``re``, the expression
+    ``exceptlib.ExceptionFrom(re)`` can be used and bound to some
+    variable. To scrape exception types raised by a containing module,
+    the classmethod ``exceptlib.ExceptionFrom.here`` can be used.
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
@@ -109,10 +116,15 @@ class ExceptionFrom(tuple):
         return tuple.__new__(cls, get_raised(*target_modules))
 
     @classmethod
-    def here(cls, *exclude: BaseException) -> tuple[BaseException]:
-        """:return tuple[BaseException]:
+    def here(
+        cls,
+        *exclude: BaseException,
+        from_file: bool=False
+    ) -> tuple[BaseException]:
+        """:return tuple[BaseException]: scraped exception types
         
-        :param *exclude: zero or more exception objects
+        :param *exclude: zero or more excluded exception types
+        :param search_space: ``None`` or sequence of name-module maps
 
         Return a tuple of distinct exception classes found in the
         calling module. This classmethod searches the module's AST
@@ -121,7 +133,9 @@ class ExceptionFrom(tuple):
         to an exception tuple and returned.
 
         Zero or more exceptions can be passed in to indicate they
-        should be excluded.
+        should be excluded. By default, this classmethod searches both
+        ``sys.modules`` and ``globals()`` to find a module object whose
+        name matches ``__name__``.
         """
         logger.debug("ExceptionFrom.here: enter")
         path_obj = Path(__file__)
@@ -130,19 +144,26 @@ class ExceptionFrom(tuple):
         if not path_obj.exists():
             return cls()
 
-        # use a fresh module
-        module = module_from_spec(
-            spec_from_file_location(__name__, __file__)
-        )
+        # obtain module in which this is called
+        if from_file:
+            module = module_from_spec(
+                spec_from_file_location(__name__, __file__)
+            )
+        else:
+            module = globals().get(__name__) or sys.modules.get(__name__)
+
+        # raise if no module or return exceptions less excluded
+        if module is None:
+            raise NameError("Unable to find module %s", __name__)
         return cls(e for e in get_raised(module) if e not in exclude)
 
 
 def get_raised(
     *modules: ModuleType, file_encoding="utf-8"
 ) -> tuple[BaseException]:
-    """:return tuple[BaseException]:
+    """:return tuple[BaseException]: scraped exception types
     
-    :param *modules: one or more input modules
+    :param *modules: one or more modules to scrape
     :param file_encoding: string representing encoding of module files
     
     Accept zero or more module objects and scrape raise clauses from
@@ -202,7 +223,7 @@ def evaluate_implicated(
     target_modules: tuple[ModuleType],
     root_only: bool=True
 ) -> bool:
-    """:return bool:
+    """:return bool: the module is involved or not
     
     :param involved_modules: tuple of modules involved in the exception
     :param target_modules: tuple of target modules
@@ -214,7 +235,7 @@ def evaluate_implicated(
     matches the last in ``involved_modules`` (i.e. the exception's
     root module), return ``True``.
 
-    Set ``root_only`` to ``False`` to return ``True`` when any one of
+    Set ``root_only`` to ``False`` to return ``True`` when *any one of*
     ``target_modules`` is an element in ``involved_modules``.
     """
     logger.debug("evaluate_implicated: enter")
@@ -238,7 +259,7 @@ def evaluate_implicated(
 
 
 def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
-    """:return tuple[tuple]:
+    """:return tuple[tuple]: of module objects
     
     :param exception: exception object to extract modules from
     :param **search_kwargs: optional keyword arguments
