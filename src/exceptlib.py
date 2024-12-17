@@ -424,6 +424,8 @@ def is_hot_exc_info(obj: Any) -> bool:
     """
     logger.debug("is_exc_info: enter")
     if isinstance(obj, tuple) and len(obj) == 3:
-        if type(obj[1]) == obj[0] and type(obj[2]) == TracebackType:
+        if obj[0] is None:
+            return False
+        if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
             return True
     return False
