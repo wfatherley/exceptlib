@@ -89,8 +89,7 @@ class ExceptionFrom(tuple):
         logger.debug("ExceptionFrom.__init__: enter")
 
         # enter assume handling exception by module
-        exception_chain = get_exception_chain(sys.exc_info())
-        if exception_chain: # pylint: disable=R1705
+        if exception_chain := get_exception_chain(sys.exc_info()):
             target_is_involved = evaluate_implicated(
                 get_modules(exception_chain[0]),
                 target_modules,
@@ -105,8 +104,7 @@ class ExceptionFrom(tuple):
             return tuple.__new__(cls, (random_exception()(),))
 
         # or enter scraping functionality if no current exception
-        else:
-            return tuple.__new__(cls, get_raised(*target_modules))
+        return tuple.__new__(cls, get_raised(*target_modules))
 
     @classmethod
     def here(cls, *exclude: BaseException) -> tuple[BaseException]:

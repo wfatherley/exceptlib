@@ -19,10 +19,10 @@ class TestIsHotExcInfo(unittest.TestCase):
         self.assertFalse(exceptlib.is_hot_exc_info(tuple()))
         self.assertFalse(exceptlib.is_hot_exc_info("123"))
         self.assertFalse(exceptlib.is_hot_exc_info(sys.exc_info()))
+        exc = Exception()
+        self.assertFalse(exceptlib.is_hot_exc_info((type(exc), exc, exc.__traceback__)))
 
         # true-inducing input
-        exc = Exception()
-        #self.assertTrue(exceptlib.is_hot_exc_info((type(exc), exc, exc.__traceback__)))
         try:
             raise KeyError()
         except:
@@ -101,3 +101,12 @@ class TestGetCodeFilenames(unittest.TestCase):
         with self.assertRaises(ValueError):
             exceptlib.get_code_filenames(7)
 
+
+class TestGetModulesFromFilename(unittest.TestCase):
+    "test exceptlib.get_modules_from_filename"
+    pass
+
+
+class TestGetModules(unittest.TestCase):
+    """test exceptlib.get_modules"""
+    pass
