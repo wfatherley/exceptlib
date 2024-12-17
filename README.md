@@ -44,9 +44,9 @@ In the `try` block above, three calls are made with the last raising `TypeError`
  - since the error came from `re`, the third `except` block executes;
  - and since the third is entered, the last `except` block is not entered despite indicating `TypeError`.
 
-The conceptual utilities of `exceptlib.ExceptionFrom` span program flexibility and development operations:
+The conceptual utility of `exceptlib.ExceptionFrom` spans program flexibility and development operations:
 
- - enable certain retries and fallbacks during runtime exceptions with less boilerplate;
+ - enable certain retries and fallbacks for exceptions in production with less boilerplate;
  - enhance or simplify RCAs in test;
  - and generally widen the scope of `except` clauses.
 

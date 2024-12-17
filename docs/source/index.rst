@@ -6,9 +6,9 @@
 ``exceptlib`` - exception handling mechanisms
 =============================================
 
-Exceptions occur in Python when something goes wrong. For example, ``"abcd"[63]`` raises ``IndexError``. What to do with an exception is context dependent-- in any langauge, context informs a spectrum of handling mechanisms. At one end, certain exceptions will or must be fatal, while at the other end a given exception acts as control of flow and is suppressed. A process to arrive somewhere on this spectrum is summarized by `Joe Armstrong's *let it crash* principal <https://softwareengineering.stackexchange.com/a/421837>`_, which is also covered in Python's `exception documentation <https://docs.python.org/3/tutorial/errors.html#handling-exceptions>`_:
+Exceptions occur in Python when something goes wrong. For example, ``"abcd"[63]`` raises ``IndexError``. What to do with an exception is context dependent-- in any langauge, context informs a spectrum of handling mechanisms. At one end, certain exceptions will or must be fatal, while at the other end a given exception acts as control of flow and is suppressed. A process to arrive somewhere on this spectrum is summarized by `Joe Armstrong's "let it crash" principal <https://softwareengineering.stackexchange.com/a/421837>`_, which is also covered in Python's `exception documentation <https://docs.python.org/3/tutorial/errors.html#handling-exceptions>`_:
 
-   [...] it is good practice to be as specific as possible with the types of exceptions that we intend to handle, and to allow any unexpected exceptions to propagate on.
+   *[...] it is good practice to be as specific as possible with the types of exceptions that we intend to handle, and to allow any unexpected exceptions to propagate on.*
 
 This experimental library extends Python's exception handling mechanism with two available functionalities as its API:
 
@@ -50,9 +50,9 @@ In the ``try`` block above, three calls are made with the last raising ``TypeErr
  * since the error came from ``re``, the third ``except`` block executes;
  * and since the third is entered, the last ``except`` block is not entered despite indicating ``TypeError``.
 
-The conceptual utilities of ``exceptlib.ExceptionFrom`` span program flexibility and development operations:
+The conceptual utility of ``exceptlib.ExceptionFrom`` spans program flexibility and development operations:
 
- * enable certain retries and fallbacks during runtime exceptions with less boilerplate;
+ * enable certain retries and fallbacks for exceptions in production with less boilerplate;
  * enhance or simplify RCAs in test;
  * and generally widen the scope of ``except`` clauses.
 

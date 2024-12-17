@@ -37,10 +37,13 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
 class NotThisException(BaseException):
     """A sentinal-like exception class.
     
-    This ``BaseException`` subclass exists to support the need for a
-    an exception that cannot happen during runtime. In this way, its
-    similar to the return value of ``random_exception``, but doesn't
-    involve dynamic class creation.
+    This ``BaseException`` subclass supports the need for a "private"
+    exception. For example, instances of ``exceptlib.ExceptionFrom``
+    utlize this private exception to pass exception handling to the
+    next avaialable ``except`` clause, if any. This exception should
+    not need to be raised in normal circumstances-- utility is limited
+    to applications surrounding ``exceptlib``, and care should be taken
+    when using it elsewhere.
     """
 
     def __init_subclass__(cls) -> None:
@@ -49,49 +52,48 @@ class NotThisException(BaseException):
 
 
 class ExceptionFrom(tuple):
-    """A tuple subclass for use in exception handling.
+    """A ``tuple`` subclass for use in exception handling.
+
+    When called as the predicate of an ``except`` clause, this object
+    enables the handling of the current exception by module rather than
+    by exception or exception group. Input parameters are zero or more
+    module objects.
+
+    When zero module objects are supplied, this object is always an
+    empty ``tuple``. When one or more module objects are supplied, this
+    object is a length-one tuple, with
+
+     - the current exception as its sole element if any of the module \
+    objects raised the exception;
+     - a dynamically-created, "difficult to replicate" exception if \
+    none of the module obejcts raised the exception.
     
-    This `tuple` subclass is designed to be the predicate of an
-    ``except`` clause. Rather than containing elements of type
-    ``BaseException``, this object contains elements of type
-    ``types.ModuleType``. The functionality during exception
-    handling events is therefore to handle the current exception by
-    module.
+    In other words, an ``except`` clause with a predicate of the
+    form ``ExceptionFrom(mod1, mod2, ...)`` is entered only if one of
+    ``mod1, mod2, ...`` raised the current exception, and no prior
+    ``except`` clauses have entered.
+
+    Different behavior is acheived through the ``root_only`` keyword
+    only argument. When set to ``False`` (default is ``True``), the
+    sole element of this object is the current except if one of the
+    input module objects raised at any point in the current exception's
+    chain.
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
-        """:return tuple:
+        """:return tuple: zero or more exceptions
         
-        :param *target_modules: sequence of module objects
+        :param *target_modules: zero or more module objects
         :param **kwargs: optional keyword arguments
         
-        Construct class, a tuple of zero or more exception types. The
-        elements in this tuple depend on two factors-- if the thread
-        has a current exception and which module objects are passed in.
-
-        When there is a current exception and one of the input module
-        objects raised the exception, then this is a length-one tuple
-        whose element is the exception type. There is an optional
-        keyword argument, ``root_only``, which when set to ``False``
-        makes this a length-one tuple of the current exception type if
-        any of the input module objects was involved in any of the
-        current exception's tracebacks. The aim is to enter exception
-        handling based on module by calling this class in an ``except``
-        clause. If there are no input modules passed in, this is a
-        length-zero tuple.
-
-        When there is no current exception, and no input modules, this
-        is a length-zero tuple. Otherwise, this is a variable length
-        tuple of the distinct exception types raised by the one or more
-        input module objects. This behavior can be used to construct
-        exception groups.
+        Accept zero or more module objects, .
         """
         logger.debug("ExceptionFrom.__init__: enter")
 
         # enter assume handling exception by module
         if exception_chain := get_exception_chain(sys.exc_info()):
             target_is_involved = evaluate_implicated(
-                get_modules(exception_chain[0]),
+                get_modules(exception_chain[0], **kwargs),
                 target_modules,
                 root_only=kwargs.get("root_only", True)
             )

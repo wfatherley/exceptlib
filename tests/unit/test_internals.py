@@ -110,3 +110,8 @@ class TestGetModulesFromFilename(unittest.TestCase):
 class TestGetModules(unittest.TestCase):
     """test exceptlib.get_modules"""
     pass
+
+
+class TestEvaluateImplicated(unittest.TestCase):
+    """test exceptlib.evaluate_implicated"""
+    pass
