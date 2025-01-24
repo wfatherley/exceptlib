@@ -272,43 +272,6 @@ def evaluate_implicated(
     return False
 
 
-def get_modules_from_filename(
-    file_name: str, search_space: Sequence, ensure_exists: bool=True
-) -> tuple[ModuleType]:
-    """:return tuple[ModuleType]:
-    
-    :param file_name: file name string
-    :param search_space: arbitrary mapping
-    :param ensure_exists: 
-    
-    Accept a filename and attempt to find it as a __file__ attribute of
-    ModuleType values in a search space dictionary. Return a tuple
-    whose elements are modules that match the input filename.
-    
-    By default, the input filename must exist for the search to be
-    performed; ``ValueError`` is raised if it does not. To alter this
-    default behavior, set optional parameter ``ensure_exists`` to
-    ``False``.
-    """
-    logger.debug("mod_from_filename: enter; file_name=%s", file_name)
-
-    # ensure file_name refers to existing file
-    if ensure_exists and not Path(file_name).exists():
-        logger.error(
-            "mod_from_filename: DNE or is builtin; file_name=%s", file_name
-        )
-        raise ValueError("module file name DNE, possible builtin")
-
-    # look for and return matches
-    matches = []
-    for value in search_space:
-        if getattr(value, "__file__", None) == file_name:
-            logger.debug("mod_from_filename: mod=%s", value.__name__)
-            if isinstance(value, ModuleType):
-                matches.append(value)
-    return tuple(matches)
-
-
 def get_code_filenames(exception: BaseException) -> tuple[str]:
     """:return tuple[str]: of involved module filenames
     
@@ -358,52 +321,6 @@ def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
     return tuple(result)
 
 
-def get_exception_chain(
-    exception_obj: tuple | BaseException, earliest_first: bool=True
-) -> tuple[BaseException]:
-    """:return tuple[BaseException]:
-    
-    :param exception_obj: ``exc_info`` triple or exception instance
-    :param earliest_first: boolean sorting flag
-
-    Accept a ``sys.exc_info``-like triple or an exception instance, and
-    accumulate it and any chained exceptions. Return a tuple of these
-    exceptions in earliest-to-latest order by default. Set
-    ``earliest_first`` to ``False` to return in latest-to-earliest
-    order.
-    """
-    logger.debug("get_exception_chain: enter")
-
-    # preprocess and initialize result containter
-    if is_hot_exc_info(exception_obj):
-        exception_obj = exception_obj[1]
-    if not isinstance(exception_obj, BaseException):
-        raise ValueError("input not an exception or exc_info tuple")
-    result = [exception_obj]
-
-    # get any other chained exceptions
-    while True:
-
-        # enter if: raise new_exc from original_exc
-        if exception_obj.__cause__ is not None:
-            exception_obj = exception_obj.__cause__
-
-        # enter if: raised without from keyword during original_exc
-        #           or with from None
-        elif exception_obj.__context__ is not None:
-            exception_obj = exception_obj.__context__
-
-        # break if no chain or end of chain and maybe append
-        else:
-            break
-        result.append(exception_obj)
-
-    # maybe reverse and then return
-    if earliest_first:
-        result.reverse()
-    return tuple(result)
-
-
 def is_hot_exc_info(obj: Any) -> bool:
     """:return bool:
     
@@ -420,9 +337,3 @@ def is_hot_exc_info(obj: Any) -> bool:
         if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
             return True
     return False
-
-
-def f(tb):
-    while tb.tb_next is not None:
-        tb = tb.tb_next
-    
