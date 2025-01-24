@@ -2,8 +2,8 @@
 import ast
 import inspect
 import sys
+import traceback
 
-from functools import reduce
 from logging import getLogger
 from pathlib import Path
 from random import sample
@@ -93,21 +93,22 @@ class ExceptionFrom(tuple):
         :param *target_modules: zero or more module objects
         :param **kwargs: optional keyword arguments
         
-        Accept zero or more module objects, .
+        Accept zero or more module objects, WIP.
         """
         logger.debug("ExceptionFrom.__init__: enter")
 
         # enter assume handling exception by module
-        if exception_chain := get_exception_chain(sys.exc_info()):
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if exc_type is not None:
             target_is_involved = evaluate_implicated(
-                get_modules(exception_chain[0], **kwargs),
+                get_traceback_modules(exc_traceback),
                 target_modules,
                 root_only=kwargs.get("root_only", True)
             )
 
             # set class to a tuple with the current exception
             if target_is_involved:
-                return tuple.__new__(cls, (exception_chain[-1],))
+                return tuple.__new__(cls, (exc_value,))
 
             # or impossible exception if target module(s) not involved
             return tuple.__new__(cls, (random_exception()(),))
@@ -154,7 +155,7 @@ class ExceptionFrom(tuple):
 
         # raise if no module or return exceptions less excluded
         if module is None:
-            raise NameError("Unable to find module %s", __name__)
+            raise NameError("unable to find module %s", __name__)
         return cls(e for e in get_raised(module) if e not in exclude)
 
 
@@ -218,6 +219,23 @@ def get_raised(
     return tuple(exceptions)
 
 
+def get_traceback_modules(exc_traceback: TracebackType) -> tuple[tuple]:
+    """:return tuple[tuple]: of module objects
+    
+    :param exc_traceback: traceback object to extract modules from
+    """
+
+    # loop over frames and modules
+    result = []
+    for frame in traceback.walk_tb(exc_traceback):
+        for module in sys.modules.values():
+            if getattr(module, "__file__", "") == frame.f_code.co_filename:
+                result.append(module)
+
+    # recast and return result
+    return tuple(result)
+
+
 def evaluate_implicated(
     involved_modules: tuple[ModuleType],
     target_modules: tuple[ModuleType],
@@ -246,60 +264,12 @@ def evaluate_implicated(
 
     # when concern is about the root module that raised is a target
     if root_only:
-        involved_modules = involved_modules[-1]
-
-    # when concern that any target was involved in the raising
-    else:
-        involved_modules = reduce(lambda x,y: x + y, involved_modules)
+        involved_modules = involved_modules[-1:]
 
     # return result
     if not set(involved_modules).isdisjoint(set(target_modules)):
         return True
     return False
-
-
-def get_modules(exception: BaseException, **search_kwargs) -> tuple[tuple]:
-    """:return tuple[tuple]: of module objects
-    
-    :param exception: exception object to extract modules from
-    :param **search_kwargs: optional keyword arguments
-    
-    Accept one exception instance and return a tuple of tuples. Each
-    tuple in the containing tuple contains at least one module object,
-    corresponding to a particular traceback object bound to the
-    exception instance. The last tuple corresponds to the very first
-    traceback object so that the module it contains is the module that
-    first raised.
-
-    Pass additional keyword arguments to tune behavior. For example,
-    ``search_space`` is a mapping in which module objects are found,
-    given the file name extracted from a traceback object. This is
-    necessary since multiple of one module may exist while only one
-    raised. Pass in ``ensure_exists`` to ensure a particular filename
-    exists during the search for module objects.
-    """
-    logger.debug("get_modules: enter")
-
-    # unpack search keyword arguments for clarity
-    ensure_exists = search_kwargs.get("ensure_exists", True)
-    search_space = search_kwargs.get(
-        "search_space", (sys.modules.values(), globals().values())
-    )
-
-    # loop over code filenames found in each traceback of exception
-    result = []
-    for filename in get_code_filenames(exception):
-        for search_space_item in search_space:
-
-            # search for modules by filename in search spaces
-            modules = get_modules_from_filename(
-                    filename, search_space_item, ensure_exists=ensure_exists
-                )
-            if modules:
-                result.append(modules)
-
-    # recast and return result
-    return tuple(result)
 
 
 def get_modules_from_filename(
@@ -340,7 +310,7 @@ def get_modules_from_filename(
 
 
 def get_code_filenames(exception: BaseException) -> tuple[str]:
-    """:return tuple[str]:
+    """:return tuple[str]: of involved module filenames
     
     :param exception: exception object to extract filenames from
     
@@ -450,3 +420,9 @@ def is_hot_exc_info(obj: Any) -> bool:
         if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
             return True
     return False
+
+
+def f(tb):
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    
