@@ -11,7 +11,6 @@ from string import ascii_letters
 from types import ModuleType, TracebackType
 from typing import Any
 
-from collections.abc import Sequence # pylint: disable=E0401
 from importlib.util import module_from_spec, spec_from_file_location
 
 
@@ -48,6 +47,7 @@ class NotThisException(BaseException):
 
     def __init_subclass__(cls) -> None:
         """:return None:"""
+        logger.debug("NotThisException.__init_subclass__: enter")
         raise TypeError("subclassing not recommended")
 
 
@@ -95,25 +95,25 @@ class ExceptionFrom(tuple):
         
         Accept zero or more module objects, WIP.
         """
-        logger.debug("ExceptionFrom.__init__: enter")
+        logger.debug("ExceptionFrom.__new__: enter")
 
-        # enter assume handling exception by module
+        # case when there is a current exception
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if exc_type is not None:
-            target_is_involved = evaluate_implicated(
-                get_traceback_modules(exc_traceback),
-                target_modules,
-                root_only=kwargs.get("root_only", True)
-            )
 
-            # set class to a tuple with the current exception
-            if target_is_involved:
+            # extract modules from tracebacks
+            involved_modules = get_traceback_modules(exc_traceback)
+            if kwargs.get("root_only", False):
+                involved_modules = involved_modules[-1:]
+
+            # return tuple with current exception if target module raised
+            if not set(involved_modules).isdisjoint(set(target_modules)):
                 return tuple.__new__(cls, (exc_value,))
 
-            # or impossible exception if target module(s) not involved
+            # otherwise return tuple with random exception
             return tuple.__new__(cls, (random_exception()(),))
 
-        # or enter scraping functionality if no current exception
+        # case when there is no current exception
         return tuple.__new__(cls, get_raised(*target_modules))
 
     @classmethod
@@ -236,91 +236,6 @@ def get_traceback_modules(exc_traceback: TracebackType) -> tuple[tuple]:
     return tuple(result)
 
 
-def evaluate_implicated(
-    involved_modules: tuple[ModuleType],
-    target_modules: tuple[ModuleType],
-    root_only: bool=True
-) -> bool:
-    """:return bool: the module is involved or not
-    
-    :param involved_modules: tuple of modules involved in the exception
-    :param target_modules: tuple of target modules
-    :param root_only: flag to tune target module qualification
-    
-    Given ``involved_modules``, a tuple of module objects extracted
-    from an exception's tracebacks, compare to ``target_modules``, a
-    tuple of arbitrary module objects. If any from ``target_modules``
-    matches the last in ``involved_modules`` (i.e. the exception's
-    root module), return ``True``.
-
-    Set ``root_only`` to ``False`` to return ``True`` when *any one of*
-    ``target_modules`` is an element in ``involved_modules``.
-    """
-    logger.debug("evaluate_implicated: enter")
-
-    # when there is module proper that raised
-    if not involved_modules:
-        return False
-
-    # when concern is about the root module that raised is a target
-    if root_only:
-        involved_modules = involved_modules[-1:]
-
-    # return result
-    if not set(involved_modules).isdisjoint(set(target_modules)):
-        return True
-    return False
-
-
-def get_code_filenames(exception: BaseException) -> tuple[str]:
-    """:return tuple[str]: of involved module filenames
-    
-    :param exception: exception object to extract filenames from
-    
-    Accept an exception instance and walk through its tracebacks,
-    appending to a results list each file name found in the
-    corresponding code object. Return the list as a tuple.
-    """
-    logger.debug("get_code_filenames: enter")
-    result = []
-
-    # extract code filename from all frames from all tracebacks
-    for traceback in get_tracebacks(exception):
-        frame = traceback.tb_frame
-        while frame is not None:
-            result.append(frame.f_code.co_filename)
-            frame = frame.f_back
-
-    return tuple(result)
-
-
-def get_tracebacks(exception: BaseException) -> tuple[TracebackType]:
-    """:return tuple[TracebackType]:
-    
-    :param exception: exception object to extract tracebacks from
-
-    Accept an exception instance and return a tuple containing its
-    traceback objects, ordered latest to earliest.
-    """
-    logger.debug("get_tracebacks: enter")
-    result = []
-
-    if not isinstance(exception, BaseException):
-        logger.error(
-            "get_tracebacks: not an exception; exception=%s", exception
-        )
-        raise ValueError("input not of type BaseException")
-
-    # bind first exception and begin loop if not none
-    traceback = exception.__traceback__
-    while traceback is not None:
-
-        # append at first in loop then rebind to next traceback
-        result.append(traceback)
-        traceback = traceback.tb_next
-    return tuple(result)
-
-
 def is_hot_exc_info(obj: Any) -> bool:
     """:return bool:
     
@@ -334,6 +249,10 @@ def is_hot_exc_info(obj: Any) -> bool:
     if isinstance(obj, tuple) and len(obj) == 3:
         if obj[0] is None:
             return False
-        if isinstance(obj[1], obj[0]) and isinstance(obj[2], TracebackType):
+        if (
+            isinstance(obj[0], BaseException)
+            and isinstance(obj[1], obj[0])
+            and isinstance(obj[2], TracebackType)
+        ):
             return True
     return False
