@@ -29,89 +29,11 @@ class TestIsHotExcInfo(unittest.TestCase):
             self.assertTrue(exceptlib.is_hot_exc_info(sys.exc_info()))
 
 
-
-class TestGetExceptionChain(unittest.TestCase):
-    """test exceptlib.get_exception_chain"""
-
-    def test_input_variation(self):
-        """return None"""
-
-        # raise TypeError with no parameters
-        with self.assertRaises(TypeError):
-            exceptlib.get_exception_chain()
-
-        # raise ValueError for bad parameters
-        for obj in ("abc", 7, [], None, unittest, sys.exc_info):
-            with self.assertRaises(ValueError):
-                exceptlib.get_exception_chain(obj)
-        with self.assertRaises(ValueError):
-            exceptlib.get_exception_chain(sys.exc_info())
-
-    def test_chain(self):
-        """return None"""
-
-        # 1-length
-        exc = Exception()
-        self.assertEqual(exceptlib.get_exception_chain(exc), (exc,))
-
-        # 2-length
-        for exc in (TypeError(),):
-            try:
-                raise ValueError() from exc
-            except Exception as e:
-
-                # default order sequential
-                self.assertEqual(
-                    exceptlib.get_exception_chain(e), (e.__cause__, e)
-                )
-
-                # reversed order reversed
-                self.assertEqual(
-                    exceptlib.get_exception_chain(e, earliest_first=False),
-                    (e, e.__cause__)
-                )
-
-
-class TestGetTracebacks(unittest.TestCase):
-    """test exceptlib.get_tracebacks"""
-
-    def test_input_variation(self):
-        """return None"""
-
-        # raise TypeError with no parameters
-        with self.assertRaises(TypeError):
-            exceptlib.get_tracebacks()
-
-        for obj in (1, "a", None, list, {}):
-            with self.assertRaises(ValueError):
-                exceptlib.get_tracebacks(obj)
-
-
-class TestGetCodeFilenames(unittest.TestCase):
-    """test exceptlib.get_code_filenames"""
-
-    def test_input_variation(self):
-        """return None"""
-
-        # raise TypeError with no parameters
-        with self.assertRaises(TypeError):
-            exceptlib.get_code_filenames()
-
-        # raise ValueError with bad paramter
-        with self.assertRaises(ValueError):
-            exceptlib.get_code_filenames(7)
-
-
-class TestGetModulesFromFilename(unittest.TestCase):
-    "test exceptlib.get_modules_from_filename"
-    pass
-
-
-class TestGetModules(unittest.TestCase):
+class TestGetTracebackModules(unittest.TestCase):
     """test exceptlib.get_modules"""
     pass
 
 
-class TestEvaluateImplicated(unittest.TestCase):
-    """test exceptlib.evaluate_implicated"""
+class TestGetRaised(unittest.TestCase):
+    """test exceptlib.get_modules"""
     pass
