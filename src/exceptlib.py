@@ -33,24 +33,6 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
     return type(name, (BaseException,), attributes)
 
 
-class NotThisException(BaseException):
-    """A sentinal-like exception class.
-    
-    This ``BaseException`` subclass supports the need for a "private"
-    exception. For example, instances of ``exceptlib.ExceptionFrom``
-    utlize this private exception to pass exception handling to the
-    next avaialable ``except`` clause, if any. This exception should
-    not need to be raised in normal circumstances-- utility is limited
-    to applications surrounding ``exceptlib``, and care should be taken
-    when using it elsewhere.
-    """
-
-    def __init_subclass__(cls) -> None:
-        """:return None:"""
-        logger.debug("NotThisException.__init_subclass__: enter")
-        raise TypeError("subclassing not recommended")
-
-
 class ExceptionFrom(tuple):
     """A ``tuple`` subclass for use in exception handling.
 
