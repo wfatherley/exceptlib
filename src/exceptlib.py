@@ -201,20 +201,17 @@ def get_raised(
     return tuple(exceptions)
 
 
-def get_traceback_modules(exc_traceback: TracebackType) -> tuple[tuple]:
-    """:return tuple[tuple]: of module objects
+def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
+    """:return tuple[ModuleType]: modules extracted from traceback
     
     :param exc_traceback: traceback object to extract modules from
     """
-
-    # loop over frames and modules
+    logger.debug("get_traceback_modules: enter")
     result = []
+    sys_modules = {v.__file__: v for v in sys.modules.values()}
     for frame in traceback.walk_tb(exc_traceback):
-        for module in sys.modules.values():
-            if getattr(module, "__file__", "") == frame.f_code.co_filename:
-                result.append(module)
-
-    # recast and return result
+        if (module := sys_modules.get(frame.f_code.co_filename)) is not None:
+            result.append(module)
     return tuple(result)
 
 
