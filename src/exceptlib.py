@@ -27,6 +27,14 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
     called without parameter ``name``, the returned subclass will
     have a random 15-character (alpha only) name. Without any
     keyword arguments, it will inheret ``BaseException.__dict__``.
+
+    The purpose of this function is to provide programs with the
+    ability to utilize private exceptions-- since the name and type of
+    the return value are created at runtime, it's not possible for an
+    exception handler to handle it unless the exception handler itself
+    has dynamic abilities. This function is used by ``exceptlib`` to
+    permit an interpreter to escape an exception handler that calls
+    ``exceptlib.ExceptionFrom`` with uninvolved modules.
     """
     logger.debug("random_exception: enter")
     name = name or "".join(sample(ascii_letters, 15))
@@ -36,37 +44,23 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
 class ExceptionFrom(tuple):
     """A ``tuple`` subclass for use in exception handling.
 
-    When called as the predicate of an ``except`` clause, this object
-    enables the handling of the current exception by module rather than
-    by exception or exception group. Input parameters are zero or more
-    module objects.
+    There are three applications for this class. The first is to allow
+    exception handlers to enter based on module rather than exception.
+    For example, ``except ExceptionFrom(re): ...`` enters if the
+    interpreter's current exception originated from ``re``. This class
+    does not influence the interpreter's exception handling priority
+    mechanism, it simply allows a program to enter an exception handler
+    based on module.
 
-    If zero module objects are supplied, this object is always an empty
-    ``tuple``. If one or more module objects are supplied, this object
-    is a length-one tuple, with
+    The second and third applications are simple exception scraping
+    mechanisms. When the interpreter has no current exception, the
+    call ``ExceptionFrom(re)`` returns a tuple containing distinct
+    exception types raised in the module ``re``. Similarly, the call
+    ``ExceptionFrom.here()`` returns a tuple of exceptions raised by
+    the containing module.
 
-     - the current exception as its sole element if any of the module \
-    objects raised the exception;
-     - a dynamically-created, "difficult to replicate" exception if \
-    none of the module objects raised the exception.
-    
-    In other words, an ``except`` clause with a predicate of the
-    form ``ExceptionFrom(mod1, mod2, ...)`` is entered only if one of
-    ``mod1, mod2, ...`` raised the current exception, and no prior
-    ``except`` clauses have entered.
-
-    Different behavior is acheived through the ``root_only`` keyword
-    only argument. When set to ``False`` (default is ``True``), the
-    sole element of this object is the current except if one of the
-    input module objects raised at any point in the current exception's
-    chain.
-
-    When called in an expression assignment, this object acts to scrape
-    exception types raised in the module object sources. For example,
-    obtain a tuple of exception types raised in ``re``, the expression
-    ``exceptlib.ExceptionFrom(re)`` can be used and bound to some
-    variable. To scrape exception types raised by a containing module,
-    the classmethod ``exceptlib.ExceptionFrom.here`` can be used.
+    There are additional parameters available to tune the API described
+    above, each discussed in their cognate memeber.
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
@@ -74,10 +68,12 @@ class ExceptionFrom(tuple):
         
         :param *target_modules: zero or more module objects
         :param **kwargs: optional keyword arguments
-        
-        Accept zero or more module objects, WIP.
         """
         logger.debug("ExceptionFrom.__new__: enter")
+
+        # give nothing for nothing
+        if not target_modules:
+            return tuple.__new__()
 
         # case when there is a current exception
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -85,7 +81,7 @@ class ExceptionFrom(tuple):
 
             # extract modules from tracebacks
             involved_modules = get_traceback_modules(exc_traceback)
-            if kwargs.get("root_only", False):
+            if kwargs.get("root_only", True):
                 involved_modules = involved_modules[-1:]
 
             # return tuple with current exception if target module raised
@@ -99,11 +95,7 @@ class ExceptionFrom(tuple):
         return tuple.__new__(cls, get_raised(*target_modules))
 
     @classmethod
-    def here(
-        cls,
-        *exclude: BaseException,
-        from_file: bool=False
-    ) -> tuple[BaseException]:
+    def here(cls, from_file: bool=False) -> tuple[BaseException]:
         """:return tuple[BaseException]: scraped exception types
         
         :param *exclude: zero or more excluded exception types
@@ -125,7 +117,7 @@ class ExceptionFrom(tuple):
 
         # raise if no module or return exceptions less excluded
         if module is None:
-            raise NameError("unable to find module %s", __name__)
+            raise NameError(f"unable to find module {__name__}")
         return cls(module)
 
 
@@ -224,4 +216,24 @@ def is_hot_exc_info(obj: Any) -> bool:
             return True
     return False
 
-excs = ExceptionFrom.here()
+
+def exc_infos() -> tuple[tuple]:
+    """:return tuple[tuple]:
+    
+    Return a tuple of ``sys.exc_info``-like triples for the current
+    exception's entire ``__context__`` chain, including itself.
+    If there is no current exception, return an empty tuple.
+    """
+    logger.debug("exc_infos: enter")
+    result = [sys.exc_info()]
+    if result[-1][0] is None:
+        return tuple()
+    while result[-1][1].__context__ is not None:
+        result.append(
+            (
+                type(result[-1][1].__context__),
+                result[-1][1].__context__,
+                result[-1][1].__context__.__traceback__
+            )
+        )
+    return tuple(result)
