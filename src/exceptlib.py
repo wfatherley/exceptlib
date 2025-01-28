@@ -107,18 +107,6 @@ class ExceptionFrom(tuple):
         """:return tuple[BaseException]: scraped exception types
         
         :param *exclude: zero or more excluded exception types
-        :param search_space: ``None`` or sequence of name-module maps
-
-        Return a tuple of distinct exception classes found in the
-        calling module. This classmethod searches the module's AST
-        for ``raise`` statements, extracts their exception class, and
-        adds them to an internal set. After the search, the set is cast
-        to an exception tuple and returned.
-
-        Zero or more exceptions can be passed in to indicate they
-        should be excluded. By default, this classmethod searches both
-        ``sys.modules`` and ``globals()`` to find a module object whose
-        name matches ``__name__``.
         """
         logger.debug("ExceptionFrom.here: enter")
         path_obj = Path(__file__)
@@ -138,7 +126,7 @@ class ExceptionFrom(tuple):
         # raise if no module or return exceptions less excluded
         if module is None:
             raise NameError("unable to find module %s", __name__)
-        return cls(e for e in get_raised(module) if e not in exclude)
+        return cls(module)
 
 
 def get_raised(
@@ -235,3 +223,5 @@ def is_hot_exc_info(obj: Any) -> bool:
         ):
             return True
     return False
+
+excs = ExceptionFrom.here()
