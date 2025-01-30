@@ -32,10 +32,11 @@ class TestRandomException(unittest.TestCase):
         """:return  None:"""
 
         # poll for collision with no input parameters
+        # check constant name length
         for _ in range(500):
-            self.assertTrue(
-                exceptlib.random_exception() not in exceptlib.std_excs
-            )
+            exc = exceptlib.random_exception()
+            self.assertTrue(exc not in exceptlib.std_excs)
+            self.assertTrue(len(exc.__name__) == 15)
         
         # check equivalance of name parameter variation
         self.assertEqual(

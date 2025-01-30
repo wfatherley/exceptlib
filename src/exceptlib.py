@@ -146,6 +146,10 @@ class ExceptionFrom(tuple):
         # give nothing for nothing
         if not target_modules:
             return tuple.__new__()
+        
+        # only allow module types
+        if next(m for m in target_modules if not isinstance(m, ModuleType)):
+            raise TypeError("target modules must be of type ModuleType")
 
         # case when there is a current exception
         exc_type, exc_value, exc_traceback = sys.exc_info()
