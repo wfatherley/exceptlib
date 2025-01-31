@@ -148,11 +148,11 @@ class ExceptionFrom(tuple):
             return tuple.__new__()
         
         # only allow module types
-        if next(m for m in target_modules if not isinstance(m, ModuleType)):
+        if any(not isinstance(m, ModuleType) for m in target_modules):
             raise TypeError("target modules must be of type ModuleType")
 
         # case when there is a current exception
-        exc_type, exc_value, exc_traceback = sys.exc_info()
+        exc_type, exc_value, exc_traceback = exc_infos()[0]
         if exc_type is not None:
 
             # extract modules from tracebacks
@@ -263,11 +263,20 @@ def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
     :param exc_traceback: traceback object to extract modules from
     """
     logger.debug("get_traceback_modules: enter")
+
+    # avoid looping over sys.modules in the loop over tracebacksimprove 
+    sys_modules = {
+        v.__file__: v for v in sys.modules.values() if hasattr(v, "__file__")
+    }
+
+    # accumulate modules in most-recent-call-last order
     result = []
-    sys_modules = {v.__file__: v for v in sys.modules.values()}
-    for frame in traceback.walk_tb(exc_traceback):
-        if (module := sys_modules.get(frame.f_code.co_filename)) is not None:
-            result.append(module)
+    for frame, _ in traceback.walk_tb(exc_traceback):
+        code = frame.f_code
+        if hasattr(code, "co_filename"):
+            module = sys_modules.get(code.co_filename)
+            if module is not None:
+                result.append(module)
     return tuple(result)
 
 

@@ -1,18 +1,18 @@
 """unit tests for exceptlib.ExceptionFrom"""
 import logging
 import re
-import sys
 import unittest
 
 import exceptlib
 
 
-class TestExceptionFromInitializationApi(unittest.TestCase):
+class TestInitializationApi(unittest.TestCase):
     """test exceptlib.ExceptionFrom"""
 
     def test_exception_handling_priority(self):
         """"""
         
+        # verify simplest entry
         caught = False
         try:
             re.compile(0)
@@ -20,7 +20,7 @@ class TestExceptionFromInitializationApi(unittest.TestCase):
             caught = True
         self.assertTrue(caught)
 
-        #
+        # verify no entry by priority
         try:
             logging.getLogger(1)
         except TypeError:
@@ -29,7 +29,7 @@ class TestExceptionFromInitializationApi(unittest.TestCase):
             caught = True
         self.assertFalse(caught)
 
-        # 
+        # verify entry by priority
         try:
             re.compile(2)
         except StopIteration:
