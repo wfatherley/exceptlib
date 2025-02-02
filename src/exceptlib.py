@@ -171,7 +171,7 @@ class ExceptionFrom(tuple):
 
             # return tuple with current exception if target module raised
             if not set(involved_modules).isdisjoint(set(target_modules)):
-                return tuple.__new__(cls, (exc_chain[-1][1],))
+                return tuple.__new__(cls, (exc_chain[-1][0],))
 
             # otherwise return tuple with random exception
             return tuple.__new__(cls, (random_exception()(),))

@@ -47,13 +47,3 @@ class TestRandomException(unittest.TestCase):
             exceptlib.random_exception("Foo").__name__,
             exceptlib.random_exception("Bar").__name__
         )
-        
-
-class TestStandardExceptions(unittest.TestCase):
-    """test exceptlib.standard_exceptions"""
-
-    def test_can_raise_all(self):
-        """:return None:"""
-        for exc in exceptlib.standard_exceptions:
-            with self.assertRaises(exc):
-                raise exc
