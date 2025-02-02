@@ -19,7 +19,6 @@ logger = getLogger(__name__)
 
 std_excs = standard_exceptions = (
     BaseException,
-    BaseExceptionGroup,
     GeneratorExit,
     KeyboardInterrupt,
     SystemExit,
@@ -32,7 +31,6 @@ std_excs = standard_exceptions = (
     AttributeError,
     BufferError,
     EOFError,
-    ExceptionGroup,
     ImportError,
     ModuleNotFoundError,
     LookupError,
@@ -60,7 +58,6 @@ std_excs = standard_exceptions = (
     ReferenceError,
     RuntimeError,
     NotImplementedError,
-    PythonFinalizationError,
     RecursionError,
     StopAsyncIteration,
     StopIteration,
@@ -87,6 +84,16 @@ std_excs = standard_exceptions = (
     UnicodeWarning,
     UserWarning,
 )
+try:
+    standard_exceptions += (
+        BaseExceptionGroup, ExceptionGroup, # pylint: disable=E0602
+    )
+except:
+    pass
+try:
+    standard_exceptions += (PythonFinalizationError,) # pylint: disable=E0602
+except:
+    pass
 
 
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
