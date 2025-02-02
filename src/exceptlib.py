@@ -88,11 +88,11 @@ try:
     standard_exceptions += (
         BaseExceptionGroup, ExceptionGroup, # pylint: disable=E0602
     )
-except:
+except NameError:
     pass
 try:
     standard_exceptions += (PythonFinalizationError,) # pylint: disable=E0602
-except:
+except NameError:
     pass
 
 
