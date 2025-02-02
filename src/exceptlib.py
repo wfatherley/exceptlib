@@ -146,7 +146,7 @@ class ExceptionFrom(tuple):
         # give nothing for nothing
         if not target_modules:
             return tuple.__new__()
-        
+
         # only allow module types
         if any(not isinstance(m, ModuleType) for m in target_modules):
             raise TypeError("target modules must be of type ModuleType")
@@ -159,8 +159,8 @@ class ExceptionFrom(tuple):
             if kwargs.get("root_only", True):
                 involved_modules += get_traceback_modules(exc_chain[-1][-1])
             else:
-                for _, _, traceback in exc_chain:
-                    involved_modules += get_traceback_modules(traceback)
+                for _, _, tb in exc_chain:
+                    involved_modules += get_traceback_modules(tb)
 
             # return tuple with current exception if target module raised
             if not set(involved_modules).isdisjoint(set(target_modules)):
@@ -266,7 +266,7 @@ def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
     """
     logger.debug("get_traceback_modules: enter")
 
-    # avoid looping over sys.modules in the loop over tracebacksimprove 
+    # avoid looping over sys.modules in the loop over tracebacksimprove
     sys_modules = {
         v.__file__: v for v in sys.modules.values() if hasattr(v, "__file__")
     }
