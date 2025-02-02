@@ -152,7 +152,7 @@ class ExceptionFrom(tuple):
 
         # give nothing for nothing
         if not target_modules:
-            return tuple.__new__()
+            return tuple.__new__(cls, ())
 
         # only allow module types
         if any(not isinstance(m, ModuleType) for m in target_modules):
