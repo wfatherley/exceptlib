@@ -152,17 +152,19 @@ class ExceptionFrom(tuple):
             raise TypeError("target modules must be of type ModuleType")
 
         # case when there is a current exception
-        exc_type, exc_value, exc_traceback = exc_infos()[0]
-        if exc_type is not None:
+        if exc_chain := exc_infos():
 
             # extract modules from tracebacks
-            involved_modules = get_traceback_modules(exc_traceback)
+            involved_modules = ()
             if kwargs.get("root_only", True):
-                involved_modules = involved_modules[-1:]
+                involved_modules += get_traceback_modules(exc_chain[-1][-1])
+            else:
+                for _, _, traceback in exc_chain:
+                    involved_modules += get_traceback_modules(traceback)
 
             # return tuple with current exception if target module raised
             if not set(involved_modules).isdisjoint(set(target_modules)):
-                return tuple.__new__(cls, (exc_value,))
+                return tuple.__new__(cls, (exc_chain[-1][1],))
 
             # otherwise return tuple with random exception
             return tuple.__new__(cls, (random_exception()(),))
