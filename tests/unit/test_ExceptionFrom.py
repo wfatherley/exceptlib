@@ -15,19 +15,45 @@ def raise_index_error_from_bad_logging_call():
         raise IndexError
 
 
+class TestApi(unittest.TestCase):
+    """test basic characteristics"""
 
+    def test_name(self):
+        """:return None:
+        
+        Verify the name of of the object is ``ExceptionFrom``.
+        """
+        self.assertEqual(exceptlib.ExceptionFrom.__name__, "ExceptionFrom")
+
+    def test_type(self):
+        """:return None:
+        
+        Verify ``exceptlib.ExceptionFrom`` is of type ``tuple``.
+        """
+        self.assertTrue(issubclass(exceptlib.ExceptionFrom, tuple))
+
+    def test_member_names(self):
+        """:return None:
+        
+        Verify public API names are bound.
+        """
+        exception_from_dir = dir(exceptlib.ExceptionFrom)
+        self.assertTrue("__new__" in exception_from_dir)
+        self.assertTrue("here" in exception_from_dir)
 
 
 class TestInitializationApi(unittest.TestCase):
-    """tests behavior of exceptlib.ExceptionFrom.__new__"""
+    """test behavior of exceptlib.ExceptionFrom.__new__"""
 
-    def test_sole_exception_handler(self):
+    def test_basic_exception_handler(self):
         """:return None:
         
         Verify that ``exceptlib.ExceptionFrom.__new__`` is called and
         correctly furnishes the interpreter to enter its exception
         handler when that exception handler is the only one provided.
         """
+
+        # unchained exception
         caught = False
         try:
             re.compile(0)
@@ -35,7 +61,42 @@ class TestInitializationApi(unittest.TestCase):
             caught = True
         self.assertTrue(caught)
 
-    def test_sole_exception_handler_without_root_only(self):
+        # chained exception
+        caught = False
+        try:
+            raise_index_error_from_bad_logging_call()
+        except exceptlib.ExceptionFrom(logging):
+            caught = True
+        self.assertTrue(caught)
+
+    def test_skip_basic_exception_handler(self):
+        """:return None:
+        
+        Verify that ``exceptlib.ExceptionFrom.__new__`` is called and
+        correctly furnishes the interpreter to skip its exception
+        handler because the input module is uninvolved.
+        """
+
+        # unchained exception
+        caught = False
+        try:
+            re.compile(0)
+        except exceptlib.ExceptionFrom(logging):
+            caught = True
+        except:
+            self.assertFalse(caught)
+
+        # chained exception
+        caught = False
+        try:
+            raise_index_error_from_bad_logging_call()
+        except exceptlib.ExceptionFrom(re):
+            caught = True
+        except:
+            self.assertFalse(caught)
+
+
+    def test_basic_exception_handler_without_root_only(self):
         """:return None:
         
         Verify that ``exceptlib.ExceptionFrom.__new__`` is called and
@@ -43,12 +104,49 @@ class TestInitializationApi(unittest.TestCase):
         handler when that exception handler is the only one provided.
         Keyword arguement ``root_only`` is set to ``False``.
         """
+
+        # unchained exception
         caught = False
         try:
             re.compile(0)
         except exceptlib.ExceptionFrom(re, root_only=False):
             caught = True
         self.assertTrue(caught)
+
+        # chained exception
+        caught = False
+        try:
+            re.compile(0)
+        except exceptlib.ExceptionFrom(re, root_only=False):
+            caught = True
+        self.assertTrue(caught)
+
+    def test_skip_basic_exception_handler_without_root_only(self):
+        """:return None:
+        
+        Verify that ``exceptlib.ExceptionFrom.__new__`` is called and
+        correctly furnishes the interpreter to enter its exception
+        handler when that exception handler is the only one provided.
+        Keyword arguement ``root_only`` is set to ``False``.
+        """
+
+        # unchained exception
+        caught = False
+        try:
+            re.compile(0)
+        except exceptlib.ExceptionFrom(logging, root_only=False):
+            caught = True
+        except:
+            self.assertFalse(caught)
+
+        # chained exception
+        caught = False
+        try:
+            raise_index_error_from_bad_logging_call()
+        except exceptlib.ExceptionFrom(re, root_only=False):
+            caught = True
+        except:
+            self.assertFalse(caught)
 
     def test_deprioritized_second_exception_handler(self):
         """:return None:
@@ -57,10 +155,23 @@ class TestInitializationApi(unittest.TestCase):
         alters the interpreter's priority mechanism for entering
         exception handlers.
         """
+
+        # unchained exception
         caught = None
         try:
             logging.getLogger(1)
         except TypeError:
+            caught = False
+        except exceptlib.ExceptionFrom(logging):
+            caught = True
+        self.assertIsNotNone(caught)
+        self.assertFalse(caught)
+
+        # chained exception
+        caught = None
+        try:
+            raise_index_error_from_bad_logging_call()
+        except IndexError:
             caught = False
         except exceptlib.ExceptionFrom(logging):
             caught = True
@@ -75,10 +186,23 @@ class TestInitializationApi(unittest.TestCase):
         exception handlers. Keyword argument ``root_only`` is set to
         ``False``.
         """
+
+        # unchained exception
         caught = None
         try:
             logging.getLogger(1)
         except TypeError:
+            caught = False
+        except exceptlib.ExceptionFrom(logging, root_only=False):
+            caught = True
+        self.assertIsNotNone(caught)
+        self.assertFalse(caught)
+
+        # chained exception
+        caught = None
+        try:
+            raise_index_error_from_bad_logging_call()
+        except IndexError:
             caught = False
         except exceptlib.ExceptionFrom(logging, root_only=False):
             caught = True
@@ -92,12 +216,25 @@ class TestInitializationApi(unittest.TestCase):
         handlers and enters a later one that calls
         ``exceptlib.ExceptionFrom.__new__`` with an involved module.
         """
+
+        # unchained exception
         caught = None
         try:
             re.compile(2)
         except StopIteration:
-            caught = None
+            caught = False
         except exceptlib.ExceptionFrom(re):
+            caught = True
+        self.assertIsNotNone(caught)
+        self.assertTrue(caught)
+
+        # chained exception
+        caught = None
+        try:
+            raise_index_error_from_bad_logging_call()
+        except StopIteration:
+            caught = False
+        except exceptlib.ExceptionFrom(logging):
             caught = True
         self.assertIsNotNone(caught)
         self.assertTrue(caught)
@@ -110,21 +247,36 @@ class TestInitializationApi(unittest.TestCase):
         ``exceptlib.ExceptionFrom.__new__`` with an involved module.
         Keyword argument ``root_only`` is set to ``False``.
         """
+
+        # unchained exception
         caught = None
         try:
             re.compile(2)
         except StopIteration:
-            caught = None
+            caught = False
         except exceptlib.ExceptionFrom(re, root_only=False):
             caught = True
         self.assertIsNotNone(caught)
         self.assertTrue(caught)
 
+        # chained exception
+        caught = None
+        try:
+            raise_index_error_from_bad_logging_call()
+        except StopIteration:
+            caught = False
+        except exceptlib.ExceptionFrom(logging, root_only=False):
+            caught = True
+        self.assertIsNotNone(caught)
+        self.assertTrue(caught)
+
+
     def test_no_input_gives_empty_tuple(self):
         """:return None:
         
         Verify calling ``exceptlib.ExceptionFrom.__new__`` with no
-        parameters results in an empty tuple.
+        parameters results in an empty tuple when there is no current
+        exception.
         """
         exc_from = exceptlib.ExceptionFrom()
         self.assertIsInstance(exc_from, tuple)
@@ -134,8 +286,8 @@ class TestInitializationApi(unittest.TestCase):
         """:return None:
         
         Verify calling ``exceptlib.ExceptionFrom.__new__`` with no
-        parameters results in an empty tuple. Keyword arugment
-        ``root_only`` is set to ``False``.
+        parameters results in an empty tuple when there is no current
+        exception. Keyword arugment ``root_only`` is set to ``False``.
         """
         exc_from = exceptlib.ExceptionFrom(root_only=False)
         self.assertIsInstance(exc_from, tuple)
@@ -180,3 +332,19 @@ class TestInitializationApi(unittest.TestCase):
         """
         with self.assertRaises(ValueError):
             exc_from = exceptlib.ExceptionFrom(sys, root_only=False)
+
+    # def test_scraping_ability(self):
+    #     """:return None:
+        
+    #     Verify initialization's scraping ability.
+    #     """
+        
+    #     if sys.version_info.minor == 10:
+    #     elif sys.version_info.minor == 11:
+    #     elif sys.version_info.minor == 12:
+    #     elif sys.version_info.minor == 13:
+
+
+class TestHereApi(unittest.TestCase):
+    """test behavior of ``exceptlib.ExceptionFrom.here``"""
+    pass

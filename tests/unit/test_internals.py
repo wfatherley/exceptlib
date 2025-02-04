@@ -28,17 +28,23 @@ class TestGetRaised(unittest.TestCase):
 class TestRandomException(unittest.TestCase):
     """test exceptlib.random_exception"""
 
-    def test_input_variation(self):
-        """:return  None:"""
-
-        # poll for collision with no input parameters
-        # check constant name length
+    def test_collision_loop(self):
+        """:return  None:
+        
+        Create 500 random exceptions and verify none collide with any
+        standard exceptions in Python.
+        """
         for _ in range(500):
             exc = exceptlib.random_exception()
             self.assertTrue(exc not in exceptlib.std_excs)
             self.assertTrue(len(exc.__name__) == 15)
+
+    def test_name_parameter_variation(self):
+        """:return None:
         
-        # check equivalance of name parameter variation
+        Verify name parameter can be passed inline or with its keyword
+        without altering the name of the object itself
+        """
         self.assertEqual(
             exceptlib.random_exception("Foo").__name__,
             exceptlib.random_exception(name="Foo").__name__

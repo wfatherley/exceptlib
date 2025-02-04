@@ -159,31 +159,40 @@ class ExceptionFrom(tuple):
             raise TypeError("target modules must be of type ModuleType")
 
         # case when there is a current exception
-        if exc_chain := exc_infos():
+        if exc_info_chain := exc_infos():
 
             # extract modules from tracebacks
             involved_modules = ()
             if kwargs.get("root_only", True):
-                involved_modules += get_traceback_modules(exc_chain[-1][-1])
+                involved_modules += get_traceback_modules(
+                    exc_info_chain[-1][-1]
+                )
             else:
-                for _, _, tb in exc_chain:
+                for _, _, tb in exc_info_chain:
                     involved_modules += get_traceback_modules(tb)
 
             # return tuple with current exception if target module raised
             if not set(involved_modules).isdisjoint(set(target_modules)):
-                return tuple.__new__(cls, (exc_chain[-1][0],))
+                return tuple.__new__(
+                    cls, (exc_info[0] for exc_info in exc_info_chain)
+                )
 
             # otherwise return tuple with random exception
-            return tuple.__new__(cls, (random_exception()(),))
+            return tuple.__new__(cls, (random_exception(),))
 
         # case when there is no current exception
         return tuple.__new__(cls, get_raised(*target_modules))
 
     @classmethod
-    def here(cls, from_file: bool=False) -> tuple[BaseException]:
+    def here(cls, *, from_file: bool=False) -> tuple[BaseException]:
         """:return tuple[BaseException]: scraped exception types
         
-        :param *exclude: zero or more excluded exception types
+        :param from_file: set to ``True`` to load from file
+        
+        Return a tuple of exception classes raised by the calling
+        module. If changes are applied to the module source during
+        a runtime, it's possible to capture them by setting keyword-
+        only parameter ``from_file`` to ``True``.
         """
         logger.debug("ExceptionFrom.here: enter")
         path_obj = Path(__file__)
