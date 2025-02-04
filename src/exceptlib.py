@@ -321,7 +321,7 @@ def exc_infos() -> tuple[tuple]:
     logger.debug("exc_infos: enter")
     result = [sys.exc_info()]
     if result[-1][0] is None:
-        return tuple()
+        return ()
     while result[-1][1].__context__ is not None:
         result.append(
             (
