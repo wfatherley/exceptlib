@@ -17,6 +17,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 logger = getLogger(__name__)
 
 
+# standard exceptions and associated data structures
 std_excs = standard_exceptions = (
     BaseException,
     GeneratorExit,
@@ -84,16 +85,24 @@ std_excs = standard_exceptions = (
     UnicodeWarning,
     UserWarning,
 )
+
+# not available before 3.11
 try:
     standard_exceptions += (
         BaseExceptionGroup, ExceptionGroup, # pylint: disable=E0602
     )
 except NameError:
     pass
+
+# not available before 3.13
 try:
     standard_exceptions += (PythonFinalizationError,) # pylint: disable=E0602
 except NameError:
     pass
+
+# helpful data structures
+std_exc_names = standard_exception_names = tuple(e.__name__ for e in std_excs)
+std_excs_map = dict(zip(std_exc_names, std_excs))
 
 
 def random_exception(name: str=None, **attributes: dict) -> BaseException:
@@ -240,39 +249,116 @@ def get_raised(
     # search in all input module objects
     for module in modules:
 
+        # a name : exception-type map
+        exc_alias_cache = {}
+
         # using ast.walk as traversal
         module_source = Path(inspect.getfile(module)).read_text(file_encoding)
         for node in ast.walk(ast.parse(module_source)):
 
-            # skip over non raise nodes
-            if not isinstance(node, ast.Raise):
-                continue
+            # obtain exception name
+            try:
+                exc_name = exc_type_name_from_raise_ast(node)
 
-            # case when exc is NoneType
-            if node.exc is None:
-                continue
+            # or update exception alias cache
+            except TypeError:
+                if not isinstance(node, ast.Assign):
+                    continue
+                exc_alias_cache.update(
+                    exc_alias_and_type_from_assign_ast(node) or {}
+                )
 
-            # case when exc is ast.Name
-            name_id = getattr(node.exc, "id", None)
+            # set exc_name to exception type name if its an alias
+            if exc_name in exc_alias_cache:
+                exc_name = exc_alias_cache[exc_name]
 
-            # cases when exc is ast.Call
-            if name_id is None:
-
-                # case when func is ast.Name
-                name_id = getattr(node.exc.func, "id", None)
-
-                # case when func is ast.Attribute
-                if isinstance(node.exc.func, ast.Attribute):
-                    name_id = node.exc.func.value.id
-
-            # add the exception to exception set
-            if (exception_type := getattr(module, name_id, None)) is not None:
-                exceptions.add(exception_type)
+            # update the comprehensive list of exceptions
+            if (exc_type := getattr(module, exc_name, None)) is not None:
+                exceptions.add(exc_type)
             else:
-                exceptions.add(eval(name_id)) # pylint: disable=W0123
+                exceptions.add(std_excs_map[exc_name])
 
     # instantiate and return exception tuple
     return tuple(exceptions)
+
+
+def exc_alias_and_type_from_assign_ast(
+    assign_node: ast.Assign, module: ModuleType=None
+) -> dict | None:
+    """:return dict:"""
+    logger.debug("exc_alias_and_type_from_any_ast: enter")
+
+    # raise for non-assign nodes
+    if not isinstance(assign_node, ast.Assign):
+        raise TypeError(f"expected ast.Raise, got {type(assign_node)}")
+    
+    # results container
+    result = {}
+
+    # obtain exception type name
+    exc_type_name = None
+    if isinstance(assign_node.value, ast.Call):
+        if isinstance(assign_node.value.func, ast.Name):
+            exc_type_name = assign_node.value.func.id
+        elif isinstance(assign_node.value.func, ast.Attribute):
+            exc_type_name = assign_node.value.func.value.id
+    elif isinstance(assign_node.value, ast.Name):
+        exc_type_name = assign_node.value.id
+
+    # return None if no exception type detected
+    if exc_type_name is None:
+        return None
+    
+    # return exception type name for each bound name
+    for name_node in assign_node.targets:
+        result[name_node.id] = exc_type_name
+    return result
+
+
+def exc_type_name_from_raise_ast(raise_node: ast.Raise) -> str | None:
+    """:return str: name of exception in ``ast.Raise`` node
+    
+    :param raise_node: an instance of ``ast.Raise``
+
+    Extract exception name from an ``ast.Raise`` node and return it.
+    For example, a raise node of the form ``raise TypeError("oops")``
+    will return the string ``"TypeError"``. Bare ``raise``s will result
+    in ``None`` being returned, and a node raising a bound name (e.g.,
+    ``raise alias_to_an_exception_instance_or_class``) will return the
+    bound name (i.e. ``alias_to_an_exception_instance_or_class``).
+    """
+    logger.debug("exc_name_from_raise_ast: enter")
+
+    # raise for non-raise nodes
+    if not isinstance(raise_node, ast.Raise):
+        raise TypeError(f"expected ast.Raise, got {type(raise_node)}")
+    
+    # return None for bare raise
+    if raise_node.exc is None:
+        return raise_node.exc
+
+    # otherwise handle Call node
+    if isinstance(raise_node.exc, ast.Call):
+
+        # exc name is id of func
+        name_id = getattr(raise_node.exc.func, "id", None)
+
+        # or id of func value
+        if isinstance(raise_node.exc.func, ast.Attribute):
+            name_id = raise_node.exc.func.value.id
+
+    # or handle Name node
+    elif isinstance(raise_node.exc, ast.Name):
+        name_id = getattr(raise_node.exc, "id", None)
+
+    else:
+        logger.exception(
+            "exc_name_from_raise_ast: coun't find name in %s",
+            ast.dump(raise_node)
+        )
+        raise Exception(f"couldn't find name in {ast.dump(raise_node)}")
+
+    return name_id
 
 
 def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
