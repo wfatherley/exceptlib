@@ -67,8 +67,9 @@ class TestExceptionTypeScraper(unittest.TestCase):
         try:
             self.assertTrue(
                 s.raised_exceptions == {
-                    NameError, ValueError, TypeError, Warning, IndexError
+                    NameError, ValueError, TypeError, Warning, IndexError, RuntimeError
                 }
             )
         except:
+            #print(s.raised_exceptions)
             raise

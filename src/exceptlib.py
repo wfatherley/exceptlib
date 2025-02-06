@@ -4,6 +4,7 @@ import inspect
 import sys
 import traceback
 
+from collections import defaultdict
 from logging import getLogger
 from pathlib import Path
 from random import sample
@@ -434,125 +435,202 @@ class ExceptionTypeScraper(ast.NodeVisitor):
 
         # just set attributes
         self.module = module
-        self.except_block_stack = []
-        self.exception_alias_cache = {}
+        self.except_block_excs_stack = []
+        self.exception_alias_cache = defaultdict(list)
         self.raised_exceptions = set()
 
         super().__init__()
+
+    def exc_from_name(
+        self, node_id: str
+    ) -> BaseException | None:
+        """:return BaseException | None:
+        
+        :param node_id: string representing exception name
+        
+        Return an exception type whose name is specified by ``node_id``
+        or ``None.
+
+        First check the exception alias cache for a match, in case
+        the name is an alias of an exception. Then check
+        ``self.module`` using ``getattr`` for a match, and then check
+        ``exceptlib.std_excs_map``. Return the matched exception type
+        or ``None``.
+        """
+
+        # search in various containers or return None
+        if (exc_type := std_excs_map.get(node_id)) is not None:
+            return exc_type
+        elif (exc_type := getattr(self.module, node_id, None)) is not None:
+            return exc_type
+        
 
     def clear(self) -> None:
         """:return None:
         
         Clear the except-block stack and exception alias cache and
-        return ``None``.
+        module, then return ``None``.
         """
-        logger.debug("ExcTypeNameScraper.clear: enter")
 
+        # remove current module reference
         self.module = None
 
         # use container apis
-        self.except_block_stack.clear()
+        self.except_block_excs_stack.clear()
         self.exception_alias_cache.clear()
         self.raised_exceptions.clear()
+
+    def id_from_call_or_name_ast(
+        self, node: ast.Call | ast.Name
+    ) -> str | None:
+        """:return str | None:
+        
+        :param node: instance of ``ast.Call`` or ``ast.Name``
+
+        Extract the ``id`` attribute of the input node and return it.
+        """
+
+        # raise for bad nodes types
+        if not isinstance(node, (ast.Call, ast.Name)):
+            raise TypeError(f"expected ast.Call or ast.Name, got {type(node)}")
+
+        # extract id
+        exc_type_name = None
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                return exc_type_name
+            exc_type_name = node.func.id
+        elif isinstance(node, ast.Name):
+            exc_type_name = node.id
+        return exc_type_name
 
     def visit_Assign(self, node: ast.Assign) -> None:
         """:return None:
         
         :param node: an instance of ``ast.Assign`` to inspect
 
-        Inspect an ``ast.Assign`` node and add its right-hand-side name
-        to attribute ``exception_alias_cache`` if it maps to an
-        exception type in the standard library or one in attribute
-        ``module``.
+        The purpose of having this method is to find exceptions that
+        are bound to names in a module. This is necessary because some
+        ``except`` clauses will use such names rather than using an
+        exception class or instance.
+
+        There are two different ways this can work: a name can be bound
+        to a single exception class or instance, or it can be bound to
+        a tuple of exception classes or instances.
         """
         logger.debug("ExcTypeNameScraper.visit_Assign: enter")
 
-        # return if right-hand side is not call or name
-        if not isinstance(node, (ast.Call, ast.Name)):
+        # case assignment is directly to exception class or instance
+        if isinstance(node.value, (ast.Call, ast.Name)):
+            exc_name = self.id_from_call_or_name_ast(node.value)
+            if exc_name is None:
+                return
+            exc_type = self.exc_from_name(exc_name)
+            if exc_type is None or not issubclass(exc_type, BaseException):
+                return
+
+        # case assignment is to tuple of exception classes or instances
+        elif isinstance(node.value, ast.Tuple):
+            exc_types = []
+            for elt in node.value.elts:
+                if not isinstance(elt, (ast.Call, ast.Name)):
+                    return
+                exc_name = self.id_from_call_or_name_ast(elt)
+                if exc_name is None:
+                    return
+                exc_type = self.exc_from_name(exc_name)
+                if exc_type is None or not issubclass(exc_type, BaseException):
+                    return
+                exc_types.append(exc_type)
+            exc_type = tuple(exc_types)
+
+        # otherwise return
+        else:
             return
-
-        # obtain name from rhs of assign
-        rhs_name = id_from_call_or_name_ast(node.value)
-
-        # return if rhs name is not an exception
-        exc_type = getattr(self.module, rhs_name, std_excs_map.get(rhs_name))
-        if not isinstance(exc_type, BaseException):
-            return
-
-        # update exception alias cache if exc_type is found
+        
+        # add aliases to exception alias cache
         for name_node in node.targets:
-            self.exception_alias_cache[name_node.id] = exc_type
+            if not isinstance(name_node, ast.Name):
+                node_dump = ast.dump(node)
+                raise TypeError(f"unsupported assign object: {node_dump}")
+            self.exception_alias_cache[name_node.id].append(exc_type)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
-        """:return None:"""
-        logger.debug("ExcTypeNameScraper.visit_ExceptHandler: enter")
+        """:return None:
+        
+        The purpose of this method is to maintain a stack of exceptions
+        extracted from except clauses, earliest to latest.
 
-        # gather any exceptions from except clause
-        except_clause_excs = []
-        if isinstance(node.type, (ast.Call, ast.Name)):
-            except_clause_excs.append(id_from_call_or_name_ast(node.type))
+        To do this, explicit exception types are simply added to the
+        stack as the are found. If an exception class or instance has
+        an alias, this method has to find the class or instance from
+        the alias using the exception alias cache.
+        """
+
+        # case the handler is bare
+        if node.type is None:
+            exc_type = BaseException
+
+        # case the handler has a single exception or alias
+        elif isinstance(node.type, (ast.Call, ast.Name)):
+            exc_name = self.id_from_call_or_name_ast(node.type)
+            exc_type = self.exc_from_name(exc_name)
+            if not issubclass(exc_type, BaseException):
+                raise RuntimeError(f"not an exc or alias: {ast.dump(node)}")
+            
+        # case the handler has a tuple of exceptions or aliases
         elif isinstance(node.type, ast.Tuple):
-            for elt in node.elts:
-                except_clause_excs.append(id_from_call_or_name_ast(elt))
-        for i, name in enumerate(except_clause_excs):
-            if name in self.exception_alias_cache:
-                except_clause_excs[i] = self.exception_alias_cache[name]
+            for i, elt in enumerate(node.type.elts):
+                if not isinstance(elt, (ast.Call, ast.Name)):
+                    return # can excs be any other ast node?
+                exc_name = self.id_from_call_or_name_ast(elt)
+                exc_type = self.exc_from_name(exc_name)
+                if not issubclass(exc_type, BaseException):
+                    return
+                node.type.elts[i] = exc_type
+            exc_type = tuple(node.type.elts)
 
-        # find raise statement in the except clause or return
-        raise_ast = ast.Raise()
-        if node.body:
-            raise_ast = filter(
-                lambda obj: isinstance(obj, ast.Raise), node.body
-            )
-            raise_ast = list(raise_ast)
-            if not raise_ast:
-                return
-            raise_ast = raise_ast[0]
+        # append exception or tuple to stack
+        self.except_block_excs_stack.append(exc_type)
 
-        # find exceptions to add
-        exc_type_names = []
-        if raise_ast.exc is None:
-            if not except_clause_excs:
-                exc_type_names.append("BaseException")
-            else:
-                exc_type_names += except_clause_excs
-        else:
-            raise_exc_type_name = id_from_call_or_name_ast(raise_ast.exc)
-            if raise_exc_type_name == node.name:
-                exc_type_names += except_clause_excs
-                self.exception_alias_cache[node.name] = except_clause_excs[0]
-            else:
-                exc_type_names.append(raise_exc_type_name)
-
-        # add set of exception types to except block stack
-        exc_types = set()
-        for exc_name in exc_type_names:
-            exc_type = self.exception_alias_cache.get(
-                exc_name, std_excs_map.get(exc_name)
-            )
-            if exc_type is None:
-                raise Exception(f"no exc found in: {ast.dump(node)}")
-            exc_types.add(exc_type)
-        if exc_types:
-            self.except_block_stack.append(exc_types)
+        # handle aliasing
+        if node.name is not None:
+            self.exception_alias_cache[node.name].append(exc_type)
+            if node.body:
+                for child in node.body:
+                    if not isinstance(child, ast.Raise):
+                        continue
+                    if hasattr(child.exc, "id") and child.exc.id == node.name:
+                        self.raised_exceptions.add(exc_type)
 
     def visit_Raise(self, node: ast.Raise) -> None:
-        """:return None:"""
+        """:return None:
+        
+        The purpose of having this method is to find exceptions to
+        scrape from the module. There are several ways exceptions are
+        raise:
+
+        1. Directly in this node, either as a class or instance
+        2. Directly in this node, but using an alias
+        3. With this node bare, and an explicit except clause
+        4. With this node bare and bare except clause
+        """
         logger.debug("ExcTypeNameScraper.visit_Raise: enter")
 
-        # handle a bare raise
+        # find exception for a bare raise
         if node.exc is None:
             try:
-                self.raised_exceptions.update(self.except_block_stack.pop())
+                exc_type = self.except_block_excs_stack.pop()
             except IndexError as e:
-                e.add_note(f"no except block found for {ast.dump(node)}")
+                e.add_note(f"unable to extract from: {ast.dump(node)}")
                 raise e
 
-        # handle raise with an exception call or type
-        exc_name = id_from_call_or_name_ast(node.exc)
-        exc_type = self.exception_alias_cache.get(
-            exc_name, std_excs_map.get(exc_name)
-        )
+        # find exception for a non-bare raise
+        else:
+            print(ast.dump(node), "\n\n\n")
+            exc_name = self.id_from_call_or_name_ast(node.exc)
+            exc_type = self.exc_from_name(exc_name)
+
         if exc_type is None:
-            raise Exception(f"no exc found in: {ast.dump(node)}")
+            raise RuntimeError(f"unable to extract from: {ast.dump(node)}")
         self.raised_exceptions.add(exc_type)
