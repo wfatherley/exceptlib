@@ -53,3 +53,22 @@ class TestRandomException(unittest.TestCase):
             exceptlib.random_exception("Foo").__name__,
             exceptlib.random_exception("Bar").__name__
         )
+
+
+class TestExceptionTypeScraper(unittest.TestCase):
+    """test exceptlib.ExceptionTypeScraper"""
+
+    def test_wip(self):
+        import secrets, ast, inspect, pathlib
+        module_source = pathlib.Path(inspect.getfile(exceptlib)).read_text("utf-8")
+        module_ast = ast.parse(module_source)
+        s = exceptlib.ExceptionTypeScraper(secrets)
+        s.visit(module_ast)
+        try:
+            self.assertTrue(
+                s.raised_exceptions == {
+                    NameError, ValueError, TypeError, Exception, Warning
+                }
+            )
+        except:
+            raise
