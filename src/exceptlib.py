@@ -579,16 +579,19 @@ class ExceptionTypeScraper(ast.NodeVisitor):
                 raise RuntimeError(f"not an exc or alias: {ast.dump(node)}")
             
         # case the handler has a tuple of exceptions or aliases
-        elif isinstance(node.type, ast.Tuple):
-            for i, elt in enumerate(node.type.elts):
+        elif isinstance(node.value, ast.Tuple):
+            exc_types = []
+            for elt in node.value.elts:
                 if not isinstance(elt, (ast.Call, ast.Name)):
-                    return # can excs be any other ast node?
-                exc_name = self.id_from_call_or_name_ast(elt)
-                exc_type = self.exc_from_name(exc_name)
-                if not issubclass(exc_type, BaseException):
                     return
-                node.type.elts[i] = exc_type
-            exc_type = tuple(node.type.elts)
+                exc_name = self.id_from_call_or_name_ast(elt)
+                if exc_name is None:
+                    return
+                exc_type = self.exc_from_name(exc_name)
+                if exc_type is None or not issubclass(exc_type, BaseException):
+                    return
+                exc_types.append(exc_type)
+            exc_type = tuple(exc_types)
 
         # append exception or tuple to stack
         self.except_block_excs_stack.append(exc_type)
@@ -596,12 +599,6 @@ class ExceptionTypeScraper(ast.NodeVisitor):
         # handle aliasing
         if node.name is not None:
             self.exception_alias_cache[node.name].append(exc_type)
-            if node.body:
-                for child in node.body:
-                    if not isinstance(child, ast.Raise):
-                        continue
-                    if hasattr(child.exc, "id") and child.exc.id == node.name:
-                        self.raised_exceptions.add(exc_type)
 
     def visit_Raise(self, node: ast.Raise) -> None:
         """:return None:
@@ -627,10 +624,40 @@ class ExceptionTypeScraper(ast.NodeVisitor):
 
         # find exception for a non-bare raise
         else:
-            print(ast.dump(node), "\n\n\n")
             exc_name = self.id_from_call_or_name_ast(node.exc)
             exc_type = self.exc_from_name(exc_name)
 
         if exc_type is None:
             raise RuntimeError(f"unable to extract from: {ast.dump(node)}")
         self.raised_exceptions.add(exc_type)
+
+
+class RaiseScraper(ast.NodeVisitor):
+    def visit_Raise(self, node: ast.Raise) -> None:
+        if node.exc is None:
+            pass
+        else:
+            print(self.id_from_call_or_name_ast(node.exc), "\n\n")
+    def id_from_call_or_name_ast(
+        self, node: ast.Call | ast.Name
+    ) -> str | None:
+        """:return str | None:
+        
+        :param node: instance of ``ast.Call`` or ``ast.Name``
+
+        Extract the ``id`` attribute of the input node and return it.
+        """
+
+        # raise for bad nodes types
+        if not isinstance(node, (ast.Call, ast.Name)):
+            raise TypeError(f"expected ast.Call or ast.Name, got {type(node)}")
+
+        # extract id
+        exc_type_name = None
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                return exc_type_name
+            exc_type_name = node.func.id
+        elif isinstance(node, ast.Name):
+            exc_type_name = node.id
+        return exc_type_name
