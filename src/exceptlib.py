@@ -524,8 +524,11 @@ class ExceptionTypeScraper(ast.NodeVisitor):
             try:
                 exc_type = self.except_block_excs_stack.pop()
             except IndexError as e:
-                e.add_note(f"unable to extract from: {ast.dump(node)}")
-                raise e
+                message = f"unable to extract from: {ast.dump(node)}"
+                if hasattr(e, "add_note"):
+                    e.add_note(message)
+                    raise e
+                raise IndexError(message) from e
 
         # find exception for a non-bare raise
         else:
