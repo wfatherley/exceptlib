@@ -62,14 +62,6 @@ class TestExceptionTypeScraper(unittest.TestCase):
         import secrets, ast, inspect, pathlib
         module_source = pathlib.Path(inspect.getfile(exceptlib)).read_text("utf-8")
         module_ast = ast.parse(module_source)
-        s = exceptlib.RaiseScraper()#ExceptionTypeScraper(secrets)
+        s = exceptlib.ExceptionTypeScraper(secrets)
         s.visit(module_ast)
-        # try:
-        #     self.assertTrue(
-        #         s.raised_exceptions == {
-        #             NameError, ValueError, TypeError, Warning, IndexError, RuntimeError
-        #         }
-        #     )
-        # except:
-        #     #print(s.raised_exceptions)
-        #     raise
+        # pytest

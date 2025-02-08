@@ -250,113 +250,17 @@ def get_raised(
     # search in all input module objects
     for module in modules:
 
-        # map for name:exception-type pairs
-        exc_alias_cache = {}
-
-        # using ast.walk as traversal
-        module_source = Path(inspect.getfile(module)).read_text(file_encoding)
-        for node in ast.walk(ast.parse(module_source)):
-
-            # update exception alias cache
-            if not isinstance(node, ast.Raise):
-                exc_alias_cache.update(
-                    exc_alias_and_type_name_from_assign_ast(node) or {}
-                )
-                continue
-
-            # otherwise obtain exception type name or alias
-            exc_or_alias_name = exc_type_name_from_raise_ast(node)
-
-            # add exception type if exception type name is found
-            exc_type = getattr(module, exc_or_alias_name, None)
-            if exc_type is not None:
-                exceptions.add(exc_type)
-            elif exc_type := std_excs_map.get(exc_or_alias_name) is not None:
-                exceptions.add(exc_type)
-
-            # or interpolate a bare raise and add
-            else:
-                raise Warning("bare raise")
+        # scrape
+        module_ast = ast.parse(
+            Path(inspect.getfile(module)).read_text(file_encoding)
+        )
+        scraper = ExceptionTypeScraper(module)
+        scraper.visit(module_ast)
+        exceptions.update(scraper.raised_exceptions)
+        scraper.clear()
 
     # instantiate and return exception tuple
     return tuple(exceptions)
-
-
-def exc_type_name_from_raise_ast(raise_node: ast.Raise) -> str | None:
-    """:return str: name of exception in ``ast.Raise`` node
-    
-    :param raise_node: an instance of ``ast.Raise``
-
-    Extract exception type name from an ``ast.Raise`` node and return
-    it. For example, a raise node of the form
-    ``raise TypeError("oops")`` will return the string ``"TypeError"``.
-    Bare ``raise``s will result in ``None`` being returned, and a node
-    raising a bound name (e.g.,
-    ``raise alias_to_an_exception_instance_or_class``) will return the
-    bound name (i.e. ``alias_to_an_exception_instance_or_class``).
-    """
-    logger.debug("exc_name_from_raise_ast: enter")
-
-    # raise for non-raise nodes
-    if not isinstance(raise_node, ast.Raise):
-        raise TypeError(f"expected ast.Raise, got {type(raise_node)}")
-
-    # return None for bare raise
-    if raise_node.exc is None:
-        return None
-
-    # otherwise return the exception type name or None
-    return id_from_call_or_name_ast(raise_node.exc)
-
-
-def exc_alias_and_type_name_from_assign_ast(assign_node: ast.Assign) -> dict | None:
-    """:return dict:"""
-    logger.debug("exc_alias_and_type_from_any_ast: enter")
-
-    # raise for non-assign nodes
-    if not isinstance(assign_node, ast.Assign):
-        raise TypeError(f"expected ast.Raise, got {type(assign_node)}")
-
-    # results container
-    result = {}
-
-    # obtain exception type name or return None if dne
-    exc_type_name = id_from_call_or_name_ast(assign_node.value)
-    if exc_type_name is None:
-        return None
-
-    # otherwise return exception type name for each bound name
-    for name_node in assign_node.targets:
-        result[name_node.id] = exc_type_name
-    return result
-
-
-def id_from_call_or_name_ast(
-    node: ast.Call | ast.Name
-) -> str | None:
-    """:return str | None:
-    
-    :param node: instance of ``ast.Call`` or ``ast.Name``
-    
-    
-    """
-    logger.debug("id_from_call_or_name_ast: enter")
-
-    # raise for bad nodes types
-    if not isinstance(node, (ast.Call, ast.Name)):
-        logger.exception("id_from_call_or_name_ast: got %s", type(node))
-        raise TypeError(f"expected ast.Call or ast.Name, got {type(node)}")
-
-    # extract id
-    exc_type_name = None
-    if isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name):
-            exc_type_name = node.func.id
-        elif isinstance(node.func, ast.Attribute):
-            exc_type_name = node.func.value.id
-    elif isinstance(node, ast.Name):
-        exc_type_name = node.id
-    return exc_type_name
 
 
 def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
@@ -461,9 +365,8 @@ class ExceptionTypeScraper(ast.NodeVisitor):
         # search in various containers or return None
         if (exc_type := std_excs_map.get(node_id)) is not None:
             return exc_type
-        elif (exc_type := getattr(self.module, node_id, None)) is not None:
-            return exc_type
-        
+        return getattr(self.module, node_id, None)
+
 
     def clear(self) -> None:
         """:return None:
@@ -504,7 +407,7 @@ class ExceptionTypeScraper(ast.NodeVisitor):
             exc_type_name = node.id
         return exc_type_name
 
-    def visit_Assign(self, node: ast.Assign) -> None:
+    def visit_Assign(self, node: ast.Assign) -> None: # pylint: disable=C0103
         """:return None:
         
         :param node: an instance of ``ast.Assign`` to inspect
@@ -547,7 +450,7 @@ class ExceptionTypeScraper(ast.NodeVisitor):
         # otherwise return
         else:
             return
-        
+
         # add aliases to exception alias cache
         for name_node in node.targets:
             if not isinstance(name_node, ast.Name):
@@ -555,7 +458,9 @@ class ExceptionTypeScraper(ast.NodeVisitor):
                 raise TypeError(f"unsupported assign object: {node_dump}")
             self.exception_alias_cache[name_node.id].append(exc_type)
 
-    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+    def visit_ExceptHandler( # pylint: disable=C0103
+            self, node: ast.ExceptHandler
+        ) -> None:
         """:return None:
         
         The purpose of this method is to maintain a stack of exceptions
@@ -577,7 +482,7 @@ class ExceptionTypeScraper(ast.NodeVisitor):
             exc_type = self.exc_from_name(exc_name)
             if not issubclass(exc_type, BaseException):
                 raise RuntimeError(f"not an exc or alias: {ast.dump(node)}")
-            
+
         # case the handler has a tuple of exceptions or aliases
         elif isinstance(node.value, ast.Tuple):
             exc_types = []
@@ -600,7 +505,7 @@ class ExceptionTypeScraper(ast.NodeVisitor):
         if node.name is not None:
             self.exception_alias_cache[node.name].append(exc_type)
 
-    def visit_Raise(self, node: ast.Raise) -> None:
+    def visit_Raise(self, node: ast.Raise) -> None: # pylint: disable=C0103
         """:return None:
         
         The purpose of having this method is to find exceptions to
@@ -630,34 +535,3 @@ class ExceptionTypeScraper(ast.NodeVisitor):
         if exc_type is None:
             raise RuntimeError(f"unable to extract from: {ast.dump(node)}")
         self.raised_exceptions.add(exc_type)
-
-
-class RaiseScraper(ast.NodeVisitor):
-    def visit_Raise(self, node: ast.Raise) -> None:
-        if node.exc is None:
-            pass
-        else:
-            print(self.id_from_call_or_name_ast(node.exc), "\n\n")
-    def id_from_call_or_name_ast(
-        self, node: ast.Call | ast.Name
-    ) -> str | None:
-        """:return str | None:
-        
-        :param node: instance of ``ast.Call`` or ``ast.Name``
-
-        Extract the ``id`` attribute of the input node and return it.
-        """
-
-        # raise for bad nodes types
-        if not isinstance(node, (ast.Call, ast.Name)):
-            raise TypeError(f"expected ast.Call or ast.Name, got {type(node)}")
-
-        # extract id
-        exc_type_name = None
-        if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name):
-                return exc_type_name
-            exc_type_name = node.func.id
-        elif isinstance(node, ast.Name):
-            exc_type_name = node.id
-        return exc_type_name
