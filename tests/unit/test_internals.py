@@ -59,9 +59,4 @@ class TestExceptionTypeScraper(unittest.TestCase):
     """test exceptlib.ExceptionTypeScraper"""
 
     def test_wip(self):
-        import secrets, ast, inspect, pathlib
-        module_source = pathlib.Path(inspect.getfile(exceptlib)).read_text("utf-8")
-        module_ast = ast.parse(module_source)
-        s = exceptlib.ExceptionTypeScraper(secrets)
-        s.visit(module_ast)
-        # pytest
+        pass

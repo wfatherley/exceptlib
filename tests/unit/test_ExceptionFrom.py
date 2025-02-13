@@ -320,7 +320,7 @@ class TestInitializationApi(unittest.TestCase):
         module is passed as a parameter.
         """
         with self.assertRaises(ValueError):
-            exc_from = exceptlib.ExceptionFrom(sys)
+            exceptlib.ExceptionFrom(sys)
 
     def test_cohesion_with_exceptlib_get_raised_without_root_only(self):
         """:return None:
@@ -331,20 +331,14 @@ class TestInitializationApi(unittest.TestCase):
         is set to ``False``.
         """
         with self.assertRaises(ValueError):
-            exc_from = exceptlib.ExceptionFrom(sys, root_only=False)
+            exceptlib.ExceptionFrom(sys, root_only=False)
 
-    # def test_scraping_ability(self):
-    #     """:return None:
+    def test_scraping_ability(self):
+        """:return None:
         
-    #     Verify initialization's scraping ability.
-    #     """
-        
-    #     if sys.version_info.minor == 10:
-    #     elif sys.version_info.minor == 11:
-    #     elif sys.version_info.minor == 12:
-    #     elif sys.version_info.minor == 13:
-
-
-class TestHereApi(unittest.TestCase):
-    """test behavior of ``exceptlib.ExceptionFrom.here``"""
-    pass
+        Verify initialization's scraping ability.
+        """
+        self.assertEqual(
+            set(exceptlib.ExceptionFrom(exceptlib)),
+            {NameError, RuntimeError, TypeError, ValueError}
+        )
