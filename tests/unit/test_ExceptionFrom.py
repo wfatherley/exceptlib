@@ -345,3 +345,32 @@ class TestInitializationApi(unittest.TestCase):
             set(exceptlib.ExceptionFrom(re)),
             {TypeError, ValueError}
         )
+
+    def test_standard_library_examples(self):
+        """:return None:
+        
+        Additional tests against some standard libarary modules.
+        """
+
+        # secrets will call random for RNG service
+        import math, random, secrets
+
+        # verify secrets is involved
+        try:
+            secrets.randbelow(math.inf)
+        except exceptlib.ExceptionFrom(secrets, root_only=False):
+            self.assertTrue(True)
+
+        # but also verify its not the root cause
+        try:
+            secrets.randbelow(math.inf)
+        except exceptlib.ExceptionFrom(secrets):
+            self.assertTrue(False)
+        except AttributeError:
+            self.assertTrue(True)
+
+        # and that random is the root
+        try:
+            secrets.randbelow(math.inf)
+        except exceptlib.ExceptionFrom(random):
+            self.assertTrue(True)

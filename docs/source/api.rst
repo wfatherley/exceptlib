@@ -15,14 +15,9 @@ Classes
 Functions
 ---------
 
-.. autofunction:: exceptlib::random_exception
 .. autofunction:: exceptlib::get_raised
-.. autofunction:: exceptlib::get_tracebacks
-.. autofunction:: exceptlib::get_exception_chain
+.. autofunction:: exceptlib::random_exception
+.. autofunction:: exceptlib::get_traceback_modules
 .. autofunction:: exceptlib::is_hot_exc_info
-
-
-Exceptions
-----------
-
-.. autoexception:: exceptlib::NotThisException
+.. autofunction:: exceptlib::exc_infos
+.. autofunction:: exceptlib::raise_nodes_from_module_node

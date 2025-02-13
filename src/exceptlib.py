@@ -103,49 +103,30 @@ std_exc_names = standard_exception_names = tuple(e.__name__ for e in std_excs)
 std_excs_map = dict(zip(std_exc_names, std_excs))
 
 
-def random_exception(name: str=None, **attributes: dict) -> BaseException:
-    """:return BaseException: a ``BaseException`` subclass
-    
-    :param name: optional subclass name string
-    :param **attributes: a mapping of attributes and methods
-
-    Dynamically create and return a ``BaseException`` subclass. When
-    called without parameter ``name``, the returned subclass will
-    have a random 15-character (alpha only) name. Without any
-    keyword arguments, it will inheret ``BaseException.__dict__``.
-
-    The purpose of this function is to provide programs with the
-    ability to utilize private exceptions-- since the name and type of
-    the return value are created at runtime, it's not possible for an
-    exception handler to handle it unless the exception handler itself
-    has dynamic abilities. This function is used by ``exceptlib`` to
-    permit an interpreter to escape an exception handler that calls
-    ``exceptlib.ExceptionFrom`` with uninvolved modules.
-    """
-    logger.debug("random_exception: enter")
-    name = name or "".join(sample(ascii_letters, 15))
-    return type(name, (BaseException,), attributes)
-
-
 class ExceptionFrom(tuple):
     """A ``tuple`` subclass for use in exception handling.
 
     There are two applications for this class. The first is to allow
     exception handlers to enter based on module rather than exception.
     For example, ``except ExceptionFrom(re): ...`` enters if the
-    interpreter's current exception involved originated from ``re``.
+    interpreter's current exception involved or originated from ``re``.
+    
+    By default, the calling exception handler will enter if any of
+    modules passed to this class is the root cause of the active
+    exception. To inhibit this behavior, i.e. the exception handler
+    enters if any modules passed to this class is involved in the
+    traceback or exception chain, set keyword only parameter to
+    ``False``.
+    
     This class does not influence the interpreter's exception handling
     priority mechanism, it simply allows a program to enter an
     exception handler based on module.
 
     The second application stems from its ability to scrape exception
-    types from a simple, pure-Python module. When the interpreter has
+    types from simple, pure-Python modules. When the interpreter has
     no current exception, the call ``ExceptionFrom(re)`` returns a
     tuple containing distinct exception types raised in the module
     ``re``.
-
-    There are additional parameters available to tune the API described
-    above.
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
@@ -153,6 +134,23 @@ class ExceptionFrom(tuple):
         
         :param *target_modules: zero or more module objects
         :param **kwargs: optional keyword arguments
+
+        Construct a tuple of exception types based on some number of
+        modules passed inline. The behavior of this class depends on if
+        there is an active exception held by the interpreter:
+        
+        Return a tuple with the active exception as its sole element if
+        any modules passed in is the root cause in raising the active
+        exception. If none of the modules is the root cause, return a
+        tuple whose sole element is a random exception (see
+        ``exceptlib.random_exception``). Set keyword only parameter
+        ``root_only`` (defaults to ``True``) to ``False`` so that a
+        tuple with the active exception is returned only if any of the
+        modules is at least involved by record of the tracebacks in the
+        exception chain.
+
+        If there is no active exception, return a tuple of unique
+        exception types raised by the modules passed inline.
         """
         logger.debug("ExceptionFrom.__new__: enter")
 
@@ -162,6 +160,9 @@ class ExceptionFrom(tuple):
 
         # only allow module types
         if any(not isinstance(m, ModuleType) for m in target_modules):
+            logger.error(
+                "ExceptionFrom.__new__: bad_targets=%s", target_modules
+            )
             raise TypeError("target modules must be of type ModuleType")
 
         # case when there is a current exception
@@ -170,8 +171,8 @@ class ExceptionFrom(tuple):
             # extract modules from tracebacks
             traceback_modules = ()
             if kwargs.get("root_only", True):
-                traceback_modules += get_traceback_modules(
-                    exc_info_chain[-1][-1]
+                traceback_modules += (
+                    get_traceback_modules(exc_info_chain[-1][-1])[-1],
                 )
             else:
                 for _, _, tb in exc_info_chain:
@@ -212,6 +213,7 @@ def get_raised(
 
         # only support pure-python, file-based modules for now
         if getattr(module, "__file__", None) is None:
+            logger.error("get_raised: bad_module=%s", module)
             raise ValueError(f"unable to scrape module: {module}")
 
         # parse the module ast
@@ -224,19 +226,47 @@ def get_raised(
             exc_name = _id_from_call_or_name_node(raise_node.exc)
             exc_type = getattr(module, exc_name, std_excs_map.get(exc_name))
             if exc_type is None:
-                raise RuntimeError(
-                    f"cannot find excpetion from raise: {ast.dump(raise_node)}"
-                )
+                node = ast.dump(raise_node)
+                logger.error("get_raised: bad_raise=%s", node)
+                raise RuntimeError(f"can't find excpetion from raise: {node}")
             exceptions.add(exc_type)
 
     # instantiate and return exception tuple
     return tuple(exceptions)
 
 
+def random_exception(name: str=None, **attributes: dict) -> BaseException:
+    """:return BaseException: a ``BaseException`` subclass
+    
+    :param name: optional subclass name string
+    :param **attributes: a mapping of attributes and methods
+
+    Dynamically create and return a ``BaseException`` subclass. When
+    called without parameter ``name``, the returned subclass will
+    have a random 15-character (alpha only) name. Without any
+    keyword arguments, it will inheret ``BaseException.__dict__``.
+
+    The purpose of this function is to provide programs with the
+    ability to utilize private exceptions-- since the name and type of
+    the return value are created at runtime, it's not possible for an
+    exception handler to handle it unless the exception handler itself
+    has dynamic abilities. This function is used by ``exceptlib`` to
+    permit an interpreter to escape an exception handler that calls
+    ``exceptlib.ExceptionFrom`` with uninvolved modules.
+    """
+    logger.debug("random_exception: enter")
+    name = name or "".join(sample(ascii_letters, 15))
+    return type(name, (BaseException,), attributes)
+
+
 def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
     """:return tuple[ModuleType]: modules extracted from traceback
     
     :param exc_traceback: traceback object to extract modules from
+
+    Walk through the active exception's traceback and accumulate module
+    objects by inspecting file name attributes of code objects. Return
+    a tuple of the module objects.
     """
     logger.debug("get_traceback_modules: enter")
 
@@ -311,6 +341,7 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
     to an actual exception, rather than a variable name or exception
     handler name that aliases an exception.
     """
+    logger.debug("raise_nodes_from_module_node: enter")
     exc_handlers = []
     name_map = defaultdict(list)
     results = ()
@@ -328,7 +359,22 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
 def _handle_raise_node(
     node: ast.Raise, exc_handlers: list, name_map: dict
 ) -> tuple[ast.Raise]:
-    """:return tuple[ast.Raise]:"""
+    """:return tuple[ast.Raise]:
+    
+    :param node: instance of ``ast.Raise`` to parse
+    :param exc_handlers: list of exception handler encountered
+    :param name_map: dictionary to update with node information
+    
+    Process an ``ast.Raise`` instance, and return it and possibly
+    others in a tuple. Processing involves replacing its exc attribute
+    with a ``ast.Call`` or ``ast.Name`` instance. For example when the
+    exc attribute is an exception handler name or a variable name. When
+    the raise statement is bare, it's also possible that a cognate
+    exception handler specifies more than one exception, so include an
+    ``ast.Raise`` instance for each one.
+    """
+    logger.debug("_handle_raise_node: enter")
+
     # return value
     nodes = []
 
@@ -367,7 +413,9 @@ def _handle_raise_node(
 
         # raise if exception could not be found
         else:
-            raise RuntimeError(f"couldn't find exception: {ast.dump(node)}")
+            node = ast.dump(node)
+            logger.error("_handle_raise_node: bad_raise=%s", node)
+            raise RuntimeError(f"couldn't find exception: {node}")
 
     # case not bare raise
     if isinstance(node.exc, (ast.Call, ast.Name)):
@@ -391,12 +439,31 @@ def _handle_raise_node(
 def _update_name_map(
     node: ast.Assign | ast.ExceptHandler, name_map: dict
 ) -> dict:
-    """:return dict:"""
+    """:return dict:
+    
+    :param node: node to parse
+    :param name_map: dictionary to update with node information
+
+    Accept an ``ast.Assign`` or ``ast.ExceptHandler`` node, extract a
+    name-value pair from it, update ``name_map`` with the name-value
+    pair, and return ``name_map``.
+
+    A name-value pair for ``ast.ExceptHandler`` objects are its name
+    and type attributes, respectively. If its name attribute is
+    ``None``, this function does not update ``name_map``.
+
+    More than one name-value pair can be extracted from an
+    ``ast.Assign`` instance. Name-value pairs in this case are the
+    target and value attributes, respectively.
+    """
+    logger.debug("_update_name_map: enter")
 
     # only handle assign and exc handler nodes
     if not isinstance(node, (ast.Assign, ast.ExceptHandler)):
+        node = ast.dump(node)
+        logger.error("_update_name_map: bad_node=%s", node)
         raise TypeError(
-            f"expected ast.Assign or ast.ExceptHandler, got {type(node)}"
+            f"expected ast.Assign or ast.ExceptHandler, got {node}"
         )
 
     # case node is assign
@@ -426,10 +493,13 @@ def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
 
     Extract the ``id`` attribute of the input node and return it.
     """
+    logger.debug("_id_from_call_or_name_node: enter")
 
     # raise for bad nodes types
     if not isinstance(node, (ast.Call, ast.Name)):
-        raise TypeError(f"expected ast.Call or ast.Name, got {type(node)}")
+        node = ast.dump(node)
+        logger.error("_id_from_call_or_name_node: bad_node=%s", node)
+        raise TypeError(f"expected ast.Call or ast.Name, got {node}")
 
     # extract and return id
     exc_type_name = None
