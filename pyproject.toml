@@ -14,7 +14,6 @@ classifiers = [
     "Programming Language :: Python :: 3"
 ]
 description = "Exception handling mechanisms"
-license = "MIT"
 license-files = ["LICENSE.md"]
 maintainers = [
     {name = "Will Fatherley", email = "wfatherley@proton.me"}
