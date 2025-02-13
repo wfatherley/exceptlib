@@ -7,7 +7,7 @@ Exceptions occur in Python when something goes wrong. For example, `"abcd"[63]` 
 
 > \[...\] it is good practice to be as specific as possible with the types of exceptions that we intend to handle, and to allow any unexpected exceptions to propagate on.
 
-This experimental library extends Python's exception handling mechanism with two available functionalities as its API:
+This experimental library extends Python's exception handling mechanism with two additional functionalities:
 
  - handling exceptions by module;
  - and exception class scraping from modules.
@@ -15,7 +15,7 @@ This experimental library extends Python's exception handling mechanism with two
 This library is under active development; it may require additional tuning and there are plans to add additional features.
 
 ## Usage notes
-The main feature of `exceptlib` is handling exceptions by module through the `ExceptionFrom` class. For example:
+The main feature of `exceptlib` is handling exceptions by module with `ExceptionFrom`. For example:
 
 ```python
 import re
@@ -29,9 +29,9 @@ except ExceptionFrom(re) as e:
     print(f"re raised {e[0]}")
 ```
 
-In the `try` block above, the malformed call to `re.compile` will raise `TypeError`. \[...\]. Handling exceptions by module enables a wider degree of abstraction for exception handling.
+The malformed call to `re.compile` raises `TypeError`. The interpreter calls `ExceptionFrom` when trying to enter the `except` block. When called, `ExceptionFrom` compares its module arguments to those in the current exception's traceback to determine if any are involved. Since `re` raised, `ExceptionFrom` returns the tuple `(TypeError)` and causes that `except` block to enter.
 
-Specific advantages include:
+Handling exceptions by module enables a wider degree of abstraction for exception handling. Specific advantages include:
 
  - enable certain retries and fallbacks for exceptions in production with less boilerplate;
  - enhance or simplify RCAs in test;
@@ -49,7 +49,7 @@ excs_raised_here: tuple = ExceptionFrom.here()
 excs_raised_from: tuple = ExceptionFrom(re, urllib)
 ```
 
-The `ExceptionFrom.here` class method is useful to scrape exceptions from a containing module, possibly for use in defining exception groups for example. Calling `ExceptionFrom` when there is no current exception will direct it to scrape distinct exceptions from `raise` statements in the specified modules.
+The `ExceptionFrom.here` class method is useful to scrape exceptions from `raise` statements in the containing module, possibly for use in defining exception groups for example. Calling `ExceptionFrom` when there is no current exception will direct it to scrape distinct exceptions from `raise` statements in the specified modules.
 
-## Install
+## Installation notes
 This library is available through [PyPI](https://pypi.org/project/exceptlib/) and [GitHub](https://github.com/wfatherley/exceptlib).
