@@ -42,14 +42,11 @@ In addition to its functionality as the predicate of the `except` statment, `exc
 ```python
 ...
 
-# a tuple of distinct exceptions raised in this source file
-excs_raised_here: tuple = ExceptionFrom.here()
-
 # a tuple of distinct exceptions raised by the input modules
 excs_raised_from: tuple = ExceptionFrom(re, urllib)
 ```
 
-The `ExceptionFrom.here` class method is useful to scrape exceptions from `raise` statements in the containing module, possibly for use in defining exception groups for example. Calling `ExceptionFrom` when there is no current exception will direct it to scrape distinct exceptions from `raise` statements in the specified modules.
+Calling `ExceptionFrom` when there is no current exception will direct it to scrape distinct exceptions from `raise` statements in the specified modules.
 
 ## Installation notes
 This library is available through [PyPI](https://pypi.org/project/exceptlib/) and [GitHub](https://github.com/wfatherley/exceptlib).
