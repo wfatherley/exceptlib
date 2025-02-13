@@ -11,8 +11,6 @@ from string import ascii_letters
 from types import ModuleType, TracebackType
 from typing import Any
 
-from importlib.util import module_from_spec, spec_from_file_location
-
 
 logger = getLogger(__name__)
 
@@ -191,37 +189,6 @@ class ExceptionFrom(tuple):
 
         # case when there is no current exception
         return tuple.__new__(cls, get_raised(*target_modules))
-
-    @classmethod
-    def here(cls, *, from_file: bool=False) -> tuple[BaseException]:
-        """:return tuple[BaseException]: scraped exception types
-        
-        :param from_file: set to ``True`` to load from file
-        
-        Return a tuple of exception classes raised by the calling
-        module. If changes are applied to the module source during
-        a runtime, it's possible to capture them by setting keyword-
-        only parameter ``from_file`` to ``True``.
-        """
-        logger.debug("ExceptionFrom.here: enter")
-        path_obj = Path(__file__)
-
-        # return empty tuple when nothing to parse
-        if not path_obj.exists():
-            return cls()
-
-        # obtain module in which this is called
-        if from_file:
-            module = module_from_spec(
-                spec_from_file_location(__name__, __file__)
-            )
-        else:
-            module = globals().get(__name__) or sys.modules.get(__name__)
-
-        # raise if no module or return exceptions less excluded
-        if module is None:
-            raise NameError(f"unable to find module {__name__}")
-        return cls(module)
 
 
 def get_raised(

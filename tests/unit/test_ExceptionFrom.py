@@ -39,7 +39,6 @@ class TestApi(unittest.TestCase):
         """
         exception_from_dir = dir(exceptlib.ExceptionFrom)
         self.assertTrue("__new__" in exception_from_dir)
-        self.assertTrue("here" in exception_from_dir)
 
 
 class TestInitializationApi(unittest.TestCase):
@@ -340,5 +339,5 @@ class TestInitializationApi(unittest.TestCase):
         """
         self.assertEqual(
             set(exceptlib.ExceptionFrom(exceptlib)),
-            {NameError, RuntimeError, TypeError, ValueError}
+            {RuntimeError, TypeError, ValueError}
         )
