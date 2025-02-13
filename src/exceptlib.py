@@ -130,23 +130,22 @@ def random_exception(name: str=None, **attributes: dict) -> BaseException:
 class ExceptionFrom(tuple):
     """A ``tuple`` subclass for use in exception handling.
 
-    There are three applications for this class. The first is to allow
+    There are two applications for this class. The first is to allow
     exception handlers to enter based on module rather than exception.
     For example, ``except ExceptionFrom(re): ...`` enters if the
-    interpreter's current exception originated from ``re``. This class
-    does not influence the interpreter's exception handling priority
-    mechanism, it simply allows a program to enter an exception handler
-    based on module.
+    interpreter's current exception involved originated from ``re``.
+    This class does not influence the interpreter's exception handling
+    priority mechanism, it simply allows a program to enter an
+    exception handler based on module.
 
-    The second and third applications are simple exception scraping
-    mechanisms. When the interpreter has no current exception, the
-    call ``ExceptionFrom(re)`` returns a tuple containing distinct
-    exception types raised in the module ``re``. Similarly, the call
-    ``ExceptionFrom.here()`` returns a tuple of exceptions raised by
-    the containing module.
+    The second application stems from its ability to scrape exception
+    types from a simple, pure-Python module. When the interpreter has
+    no current exception, the call ``ExceptionFrom(re)`` returns a
+    tuple containing distinct exception types raised in the module
+    ``re``.
 
     There are additional parameters available to tune the API described
-    above, each discussed in their cognate memeber.
+    above.
     """
 
     def __new__(cls, *target_modules: ModuleType, **kwargs: dict) -> tuple:
@@ -222,7 +221,7 @@ def get_raised(
 
         # walk through raise nodes and accumulate exceptions
         for raise_node in raise_nodes_from_module_node(module_node):
-            exc_name = id_from_call_or_name_node(raise_node.exc)
+            exc_name = _id_from_call_or_name_node(raise_node.exc)
             exc_type = getattr(module, exc_name, std_excs_map.get(exc_name))
             if exc_type is None:
                 raise RuntimeError(
@@ -317,20 +316,19 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
     results = ()
     for node in ast.walk(module):
         if isinstance(node, ast.Assign):
-            name_map = update_name_map(node, name_map)
+            name_map = _update_name_map(node, name_map)
         elif isinstance(node, ast.ExceptHandler):
             exc_handlers.append(node)
-            name_map = update_name_map(node, name_map)
+            name_map = _update_name_map(node, name_map)
         elif isinstance(node, ast.Raise):
-            results += handle_raise_node(node, exc_handlers, name_map)
+            results += _handle_raise_node(node, exc_handlers, name_map)
     return results
 
 
-def handle_raise_node(
+def _handle_raise_node(
     node: ast.Raise, exc_handlers: list, name_map: dict
 ) -> tuple[ast.Raise]:
     """:return tuple[ast.Raise]:"""
-
     # return value
     nodes = []
 
@@ -373,7 +371,7 @@ def handle_raise_node(
 
     # case not bare raise
     if isinstance(node.exc, (ast.Call, ast.Name)):
-        exc_name = id_from_call_or_name_node(node.exc)
+        exc_name = _id_from_call_or_name_node(node.exc)
         exc = node.exc
 
         # possibly get actual exception from alias
@@ -383,11 +381,14 @@ def handle_raise_node(
         # then add to nodes
         nodes.append(ast.Raise(exc=exc, cause=node.cause))
 
+    # maybe useful but mainly a hook for testing
+    nodes[-1].lineno = node.lineno
+
     # return tuple of raise nodes
     return tuple(nodes)
 
 
-def update_name_map(
+def _update_name_map(
     node: ast.Assign | ast.ExceptHandler, name_map: dict
 ) -> dict:
     """:return dict:"""
@@ -405,20 +406,20 @@ def update_name_map(
         for name_node in node.targets:
             if not isinstance(name_node, ast.Name):
                 continue
-            name_map[name_node.id].append(node)
+            name_map[name_node.id].append(node.value)
 
     # case node is exception handler
     elif isinstance(node, ast.ExceptHandler):
 
         # update a stack with its most recent assignment
         if node.name:
-            name_map[node.name] = node.type
+            name_map[node.name].append(node.type)
 
     # return the map
     return name_map
 
 
-def id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
+def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
     """:return str | None:
     
     :param node: instance of ``ast.Call`` or ``ast.Name``

@@ -1,9 +1,52 @@
 """unit tests for exceptlib interals"""
-import sys
+import ast
 import unittest
 
 import exceptlib
 
+
+dummy_module_source = """
+raise
+
+raise Exception
+raise BaseException("bork")
+
+try:
+    list(map)
+except TypeError:
+    raise
+
+try:
+    list()[0]
+except IndexError:
+    raise ImportError
+
+try:
+    dict()[0]
+except KeyError as e:
+    raise e
+
+my_exc = ZeroDivisionError
+raise my_exc
+""".strip()
+dummy_module_node = ast.parse(dummy_module_source)
+dummy_module_raise_nodes = [
+    n for n in ast.walk(dummy_module_node) if isinstance(n, ast.Raise)
+]
+
+
+class TestRaiseNodeFromModuleNode(unittest.TestCase):
+    """test exceptlib.raise_nodes_from_module_node"""
+
+    def test_dummy_module_parity(self):
+        """:return None:
+        
+        Verify parity between raise nodes from a unspecialized walk and
+        nodes from the scraping walk."""
+        for node in exceptlib.raise_nodes_from_module_node(dummy_module_node):
+            self.assertTrue(
+                [n for n in dummy_module_raise_nodes if n.lineno == node.lineno]
+            )
 
 class TestExcInfos(unittest.TestCase):
     """test exceptlib.exc_infos"""
@@ -53,10 +96,3 @@ class TestRandomException(unittest.TestCase):
             exceptlib.random_exception("Foo").__name__,
             exceptlib.random_exception("Bar").__name__
         )
-
-
-class TestExceptionTypeScraper(unittest.TestCase):
-    """test exceptlib.ExceptionTypeScraper"""
-
-    def test_wip(self):
-        pass

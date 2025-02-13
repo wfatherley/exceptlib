@@ -341,3 +341,7 @@ class TestInitializationApi(unittest.TestCase):
             set(exceptlib.ExceptionFrom(exceptlib)),
             {RuntimeError, TypeError, ValueError}
         )
+        self.assertEqual(
+            set(exceptlib.ExceptionFrom(re)),
+            {TypeError, ValueError}
+        )
