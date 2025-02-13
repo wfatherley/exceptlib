@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 
 [project]
@@ -21,8 +21,14 @@ maintainers = [
 name = "exceptlib"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
-version = "2024.1"
+version = "2025.1"
 
 
 [project.urls]
 repository = "https://github.com/wfatherley/exceptlib.git"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/*"]
+
+[tool.hatch.build.targets.wheel]
+include = ["src/*"]

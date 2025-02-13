@@ -49,4 +49,4 @@ excs_raised_from: tuple = ExceptionFrom(re, urllib)
 Calling `ExceptionFrom` when there is no current exception will direct it to scrape distinct exceptions from `raise` statements in the specified modules.
 
 ## Installation notes
-This library is available through [GitHub](https://github.com/wfatherley/exceptlib).
+This library is available through [PyPI](https://pypi.org/project/exceptlib/) and [GitHub](https://github.com/wfatherley/exceptlib).
