@@ -37,7 +37,7 @@ Handling exceptions by module enables a wider degree of abstraction for exceptio
  - enhance or simplify RCAs in test;
  - and generally widen the scope of `except` clauses.
 
-In addition to its functionality as the predicate of the `except` statment, `exceptlib.ExceptionFrom` provides additional introspective functionality:
+In addition to its functionality as the predicate of the `except` statment, `exceptlib.ExceptionFrom` provides introspective functionality:
 
 ```python
 ...
