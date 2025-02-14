@@ -28,4 +28,3 @@ html_theme = 'classic'
 body_min_width = '100%'
 nodsidebar = True
 html_static_path = ['_static']
-pygments_style = "material"
