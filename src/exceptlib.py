@@ -158,12 +158,18 @@ class ExceptionFrom(tuple):
         if not target_modules:
             return tuple.__new__(cls, ())
 
-        # only allow module types
-        if any(not isinstance(m, ModuleType) for m in target_modules):
-            logger.error(
-                "ExceptionFrom.__new__: bad_targets=%s", target_modules
-            )
-            raise TypeError("target modules must be of type ModuleType")
+        # support pure-python, file-based modules for now
+        for module in target_modules:
+            if not isinstance(module, ModuleType):
+                logger.error(
+                    "ExceptionFrom.__new__: bad_types=%s", target_modules
+                )
+                raise TypeError("target modules must be of type ModuleType")
+            if getattr(module, "__file__", None) is None:
+                logger.error(
+                    "ExceptionFrom.__new__:: unsupported_module=%s", module
+                )
+                raise ValueError(f"not a file-based module: {str(module)}")
 
         # case when there is a current exception
         if exc_info_chain := exc_infos():
@@ -210,11 +216,6 @@ def get_raised(
 
     # for each input module
     for module in modules:
-
-        # only support pure-python, file-based modules for now
-        if getattr(module, "__file__", None) is None:
-            logger.error("get_raised: bad_module=%s", module)
-            raise ValueError(f"unable to scrape module: {module}")
 
         # parse the module ast
         module_node = ast.parse(
