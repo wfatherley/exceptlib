@@ -346,7 +346,7 @@ class TestInitializationApi(unittest.TestCase):
             {TypeError, ValueError}
         )
 
-    def test_standard_library_examples(self):
+    def test_stdlib_supported_examples(self):
         """:return None:
         
         Additional tests against some standard libarary modules.
@@ -374,3 +374,26 @@ class TestInitializationApi(unittest.TestCase):
             secrets.randbelow(math.inf)
         except exceptlib.ExceptionFrom(random):
             self.assertTrue(True)
+
+    def test_stdlib_unsupported_examples(self):
+        """:return None:
+        
+        Additional tests against some standard libarary modules.
+        """
+        import os
+
+        self.assertEqual(
+            set(exceptlib.ExceptionFrom(os)),
+            {
+                ImportError,
+                OSError,
+                FileNotFoundError,
+                NotADirectoryError,
+                ValueError,
+                KeyError,
+                TypeError,
+                AttributeError,
+                NotImplementedError,
+                NotImplemented
+            }
+        )

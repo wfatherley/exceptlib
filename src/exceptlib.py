@@ -165,11 +165,11 @@ class ExceptionFrom(tuple):
                     "ExceptionFrom.__new__: bad_types=%s", target_modules
                 )
                 raise TypeError("target modules must be of type ModuleType")
-            if getattr(module, "__file__", None) is None:
+            if not getattr(module, "__file__", "").endswith(".py"):
                 logger.error(
                     "ExceptionFrom.__new__:: unsupported_module=%s", module
                 )
-                raise ValueError(f"not a file-based module: {str(module)}")
+                raise ValueError(f"unsupported module: {str(module)}")
 
         # case when there is a current exception
         if exc_info_chain := exc_infos():
@@ -425,7 +425,7 @@ def _handle_raise_node(
 
         # possibly get actual exception from alias
         if name_map.get(exc_name, []):
-            exc = name_map[exc_name][-1]
+            exc = _traverse_get(name_map, exc_name)
 
         # then add to nodes
         nodes.append(ast.Raise(exc=exc, cause=node.cause))
@@ -511,3 +511,17 @@ def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
     elif isinstance(node, ast.Name):
         exc_type_name = node.id
     return exc_type_name
+
+
+def _traverse_get(name_map: dict, key: str) -> ast.AST:
+    """":return ast.AST:"""
+    logger.debug("_traverse_get: enter")
+    value = name_map[key][-1]
+    key = None
+    if isinstance(value, (ast.Call, ast.Name)):
+        key = _id_from_call_or_name_node(value)
+    while key in name_map:
+        key = None
+        if isinstance(value, (ast.Call, ast.Name)):
+            key = _id_from_call_or_name_node(value)
+    return value

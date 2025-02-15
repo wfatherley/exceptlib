@@ -26,10 +26,10 @@ from exceptlib import ExceptionFrom
 try:
     re_obj = re.compile(7)
 except ExceptionFrom(re) as e:
-    print(f"re raised {e}")
+    print(f"re raised:", e)
 ```
 
-The malformed call to `re.compile` raises `TypeError`. The interpreter calls `ExceptionFrom` when trying to enter the `except` block. When called, `ExceptionFrom` compares its module arguments to those in the current exception's traceback to determine if any are involved. Since `re` raised, `ExceptionFrom` returns the tuple `(TypeError)` and causes that `except` block to enter.
+The malformed call to `re.compile` raises `TypeError`. The interpreter calls `ExceptionFrom` when trying to enter the `except` block. When called, `ExceptionFrom` compares its module arguments to those in the current exception's traceback to determine if any are involved. Since `re` raised, `ExceptionFrom` returns the tuple `(TypeError,)` and causes that `except` block to enter.
 
 Handling exceptions by module enables a wider degree of abstraction for exception handling. Specific advantages include:
 
