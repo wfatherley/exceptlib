@@ -513,15 +513,14 @@ def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
     return exc_type_name
 
 
-def _traverse_get(name_map: dict, key: str) -> ast.AST:
+def _traverse_get(name_map: dict, key: str) -> ast.AST | None:
     """":return ast.AST:"""
     logger.debug("_traverse_get: enter")
-    value = name_map[key][-1]
-    key = None
-    if isinstance(value, (ast.Call, ast.Name)):
-        key = _id_from_call_or_name_node(value)
+    if key not in name_map:
+        return None
     while key in name_map:
+        value = name_map[key][-1]
         key = None
-        if isinstance(value, (ast.Call, ast.Name)):
+        if isinstance(value, ast.Name):
             key = _id_from_call_or_name_node(value)
     return value
