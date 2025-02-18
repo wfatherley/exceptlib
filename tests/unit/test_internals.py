@@ -28,6 +28,9 @@ except KeyError as e:
 
 my_exc = ZeroDivisionError
 raise my_exc
+my_other_exc = my_exc
+raise my_other_exc
+
 """.strip()
 dummy_module_node = ast.parse(dummy_module_source)
 dummy_module_raise_nodes = [

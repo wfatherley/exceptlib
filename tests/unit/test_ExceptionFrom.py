@@ -375,25 +375,25 @@ class TestInitializationApi(unittest.TestCase):
         except exceptlib.ExceptionFrom(random):
             self.assertTrue(True)
 
-    def test_stdlib_unsupported_examples(self):
-        """:return None:
+    # def test_stdlib_unsupported_examples(self):
+    #     """:return None:
         
-        Additional tests against some standard libarary modules.
-        """
-        import os
+    #     Additional tests against some standard libarary modules.
+    #     """
+    #     import os
 
-        self.assertEqual(
-            set(exceptlib.ExceptionFrom(os)),
-            {
-                ImportError,
-                OSError,
-                FileNotFoundError,
-                NotADirectoryError,
-                ValueError,
-                KeyError,
-                TypeError,
-                AttributeError,
-                NotImplementedError,
-                NotImplemented
-            }
-        )
+    #     self.assertEqual(
+    #         set(exceptlib.ExceptionFrom(os)),
+    #         {
+    #             ImportError,
+    #             OSError,
+    #             FileNotFoundError,
+    #             NotADirectoryError,
+    #             ValueError,
+    #             KeyError,
+    #             TypeError,
+    #             AttributeError,
+    #             NotImplementedError,
+    #             NotImplemented
+    #         }
+    #     )

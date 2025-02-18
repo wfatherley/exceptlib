@@ -50,3 +50,6 @@ Calling `ExceptionFrom` when there is no current exception will direct it to scr
 
 ## Installation notes
 This library is available through [PyPI](https://pypi.org/project/exceptlib/) and [GitHub](https://github.com/wfatherley/exceptlib).
+
+## Contributing
+Contributions are welcome in the form of feedback (issues, comments, and so on) or a documented and tested pull request.

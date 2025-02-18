@@ -471,10 +471,10 @@ def _update_name_map(
     if isinstance(node, ast.Assign):
 
         # update stacks in name map with most recent assignments
-        for name_node in node.targets:
-            if not isinstance(name_node, ast.Name):
+        for target in node.targets:
+            if not isinstance(target, ast.Name):
                 continue
-            name_map[name_node.id].append(node.value)
+            name_map[target.id].append(node.value)
 
     # case node is exception handler
     elif isinstance(node, ast.ExceptHandler):
