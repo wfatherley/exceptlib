@@ -76,7 +76,7 @@ dummy_module_raise_nodes = [
 ]
 
 
-class TestRaiseNodeFromModuleNode(unittest.TestCase):
+class TestRaiseNodesFromModuleNode(unittest.TestCase):
     """test exceptlib.raise_nodes_from_module_node"""
 
     def test_dummy_module_parity(self):
@@ -87,6 +87,17 @@ class TestRaiseNodeFromModuleNode(unittest.TestCase):
         for node in exceptlib.raise_nodes_from_module_node(dummy_module_node):
             self.assertTrue(
                 [n for n in dummy_module_raise_nodes if n.lineno == node.lineno]
+            )
+
+    def test_os_module_example_parity(self):
+        """:return None:
+        
+        Verify parity between raise nodes from a unspecialized walk and
+        nodes from the scraping walk for a specific code snippet taken
+        from module ``os``."""
+        for node in exceptlib.raise_nodes_from_module_node(os_module_node):
+            self.assertTrue(
+                [n for n in os_module_raise_nodes if n.lineno == node.lineno]
             )
 
 class TestExcInfos(unittest.TestCase):

@@ -4,6 +4,7 @@ import sys
 import traceback
 
 from collections import defaultdict
+from functools import reduce
 from logging import getLogger
 from pathlib import Path
 from random import sample
@@ -345,7 +346,7 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
     logger.debug("raise_nodes_from_module_node: enter")
     exc_handlers = []
     name_map = defaultdict(list)
-    results = ()
+    raise_nodes = []
     for node in ast.walk(module):
         if isinstance(node, ast.Assign):
             name_map = _update_name_map(node, name_map)
@@ -353,8 +354,10 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
             exc_handlers.append(node)
             name_map = _update_name_map(node, name_map)
         elif isinstance(node, ast.Raise):
-            results += _handle_raise_node(node, exc_handlers, name_map)
-    return results
+            raise_nodes.append(node)
+    for i, node in enumerate(raise_nodes):
+        raise_nodes[i] = _handle_raise_node(node, exc_handlers, name_map)
+    return reduce(lambda x, y: x + y, raise_nodes)
 
 
 def _handle_raise_node(
