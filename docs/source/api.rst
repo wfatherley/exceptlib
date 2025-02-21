@@ -9,7 +9,6 @@ Classes
 
 .. autoclass:: exceptlib::ExceptionFrom
     :class-doc-from: both
-    :members: here
 
 
 Functions
