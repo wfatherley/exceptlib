@@ -113,11 +113,12 @@ class ExceptionFrom(tuple):
     
     By default, the calling exception handler will enter if any of
     modules passed to this class is the root cause of the active
-    exception. To inhibit this behavior, i.e. the exception handler
-    enters if any modules passed to this class is involved in the
-    traceback or exception chain, set keyword only parameter to
-    ``False``.
-    
+    exception. This behavior can be modified by setting keyword only
+    argument ``root_only`` to ``False`` (defaults to ``True``). In this
+    scenario, the except handler will enter if any modules passed to
+    this class are at least involved in the active exception's chain of
+    tracebacks.
+        
     This class does not influence the interpreter's exception handling
     priority mechanism, it simply allows a program to enter an
     exception handler based on module.
