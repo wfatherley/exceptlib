@@ -10,7 +10,7 @@ from pathlib import Path
 from random import sample
 from string import ascii_letters
 from types import ModuleType, TracebackType
-from typing import Any
+from typing import Any, Generator
 
 
 logger = getLogger(__name__)
@@ -422,13 +422,24 @@ def _handle_raise_node(
             raise RuntimeError(f"couldn't find exception: {node}")
 
     # case not bare raise
-    if isinstance(node.exc, (ast.Call, ast.Name)):
+    else:
         exc_name = _id_from_call_or_name_node(node.exc)
         exc = node.exc
 
         # possibly get actual exception from alias
         if name_map.get(exc_name, []):
-            exc = _traverse_get(name_map, exc_name)
+            for exc_name, exc in _traverse_get(name_map, exc_name):
+            #exc_name = _id_from_call_or_name_node(node.exc)
+
+                # check exception handler names
+                for exc_handler in exc_handlers:
+                    if exc_handler.name != exc_name:
+                        continue
+                    if isinstance(exc_handler.type, ast.Tuple):
+                        for elt in exc_handler.type.elts:
+                            nodes.append(ast.Raise(exc=elt, cause=node.cause))
+                    elif isinstance(exc_handler.type, (ast.Call, ast.Name)):
+                        nodes.append(ast.Raise(exc=exc_handler.type, cause=node.cause))
 
         # then add to nodes
         nodes.append(ast.Raise(exc=exc, cause=node.cause))
@@ -516,14 +527,14 @@ def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
     return exc_type_name
 
 
-def _traverse_get(name_map: dict, key: str) -> ast.AST | None:
+def _traverse_get(name_map: dict, key: str) -> Generator:
     """":return ast.AST:"""
     logger.debug("_traverse_get: enter")
     if key not in name_map:
-        return None
+        return
     while key in name_map:
         value = name_map[key][-1]
+        yield key, value
         key = None
         if isinstance(value, ast.Name):
             key = _id_from_call_or_name_node(value)
-    return value
