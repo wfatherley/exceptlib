@@ -66,4 +66,5 @@ Contents
    :caption: Contents:
 
    api
+   sequence_diagrams
 
