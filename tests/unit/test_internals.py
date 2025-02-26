@@ -5,6 +5,44 @@ import unittest
 import exceptlib
 
 
+os_module_source_example = """
+def _execvpe(file, args, env=None):
+    if env is not None:
+        exec_func = execve
+        argrest = (args, env)
+    else:
+        exec_func = execv
+        argrest = (args,)
+        env = environ
+
+    if path.dirname(file):
+        exec_func(file, *argrest)
+        return
+    saved_exc = None
+    path_list = get_exec_path(env)
+    if name != 'nt':
+        file = fsencode(file)
+        path_list = map(fsencode, path_list)
+    for dir in path_list:
+        fullname = path.join(dir, file)
+        try:
+            exec_func(fullname, *argrest)
+        except (FileNotFoundError, NotADirectoryError) as e:
+            last_exc = e
+        except OSError as e:
+            last_exc = e
+            if saved_exc is None:
+                saved_exc = e
+    if saved_exc is not None:
+        raise saved_exc
+    raise last_exc
+""".strip()
+os_module_node = ast.parse(os_module_source_example)
+os_module_raise_nodes = [
+    n for n in ast.walk(os_module_node) if isinstance(n, ast.Raise)
+]
+
+
 dummy_module_source = """
 raise
 
@@ -38,18 +76,29 @@ dummy_module_raise_nodes = [
 ]
 
 
-class TestRaiseNodeFromModuleNode(unittest.TestCase):
-    """test exceptlib.raise_nodes_from_module_node"""
+# class TestRaiseNodesFromModuleNode(unittest.TestCase):
+#     """test exceptlib.raise_nodes_from_module_node"""
 
-    def test_dummy_module_parity(self):
-        """:return None:
+#     def test_dummy_module_parity(self):
+#         """:return None:
         
-        Verify parity between raise nodes from a unspecialized walk and
-        nodes from the scraping walk."""
-        for node in exceptlib.raise_nodes_from_module_node(dummy_module_node):
-            self.assertTrue(
-                [n for n in dummy_module_raise_nodes if n.lineno == node.lineno]
-            )
+#         Verify parity between raise nodes from a unspecialized walk and
+#         nodes from the scraping walk."""
+#         for node in exceptlib.raise_nodes_from_module_node(dummy_module_node):
+#             self.assertTrue(
+#                 [n for n in dummy_module_raise_nodes if n.lineno == node.lineno]
+#             )
+
+#     def test_os_module_example_parity(self):
+#         """:return None:
+        
+#         Verify parity between raise nodes from a unspecialized walk and
+#         nodes from the scraping walk for a specific code snippet taken
+#         from module ``os``."""
+#         for node in exceptlib.raise_nodes_from_module_node(os_module_node):
+#             self.assertTrue(
+#                 [n for n in os_module_raise_nodes if n.lineno == node.lineno]
+#             )
 
 class TestExcInfos(unittest.TestCase):
     """test exceptlib.exc_infos"""

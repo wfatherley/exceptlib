@@ -4,12 +4,13 @@ import sys
 import traceback
 
 from collections import defaultdict
+from functools import reduce
 from logging import getLogger
 from pathlib import Path
 from random import sample
 from string import ascii_letters
 from types import ModuleType, TracebackType
-from typing import Any
+from typing import Any, Generator
 
 
 logger = getLogger(__name__)
@@ -237,99 +238,30 @@ def get_raised(
     return tuple(exceptions)
 
 
-def random_exception(name: str=None, **attributes: dict) -> BaseException:
-    """:return BaseException: a ``BaseException`` subclass
+def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
+    """:return str | None:
     
-    :param name: optional subclass name string
-    :param **attributes: a mapping of attributes and methods
+    :param node: instance of ``ast.Call`` or ``ast.Name``
 
-    Dynamically create and return a ``BaseException`` subclass. When
-    called without parameter ``name``, the returned subclass will
-    have a random 15-character (alpha only) name. Without any
-    keyword arguments, it will inheret ``BaseException.__dict__``.
-
-    The purpose of this function is to provide programs with the
-    ability to utilize private exceptions-- since the name and type of
-    the return value are created at runtime, it's not possible for an
-    exception handler to handle it unless the exception handler itself
-    has dynamic abilities. This function is used by ``exceptlib`` to
-    permit an interpreter to escape an exception handler that calls
-    ``exceptlib.ExceptionFrom`` with uninvolved modules.
+    Extract the ``id`` attribute of the input node and return it.
     """
-    logger.debug("random_exception: enter")
-    name = name or "".join(sample(ascii_letters, 15))
-    return type(name, (BaseException,), attributes)
+    logger.debug("_id_from_call_or_name_node: enter")
 
+    # raise for bad nodes types
+    if not isinstance(node, (ast.Call, ast.Name)):
+        node = ast.dump(node)
+        logger.error("_id_from_call_or_name_node: bad_node=%s", node)
+        raise TypeError(f"expected ast.Call or ast.Name, got {node}")
 
-def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
-    """:return tuple[ModuleType]: modules extracted from traceback
-    
-    :param exc_traceback: traceback object to extract modules from
-
-    Walk through the active exception's traceback and accumulate module
-    objects by inspecting file name attributes of code objects. Return
-    a tuple of the module objects.
-    """
-    logger.debug("get_traceback_modules: enter")
-
-    # avoid looping over sys.modules in the loop over tracebacksimprove
-    sys_modules = {
-        v.__file__: v for v in sys.modules.values() if hasattr(v, "__file__")
-    }
-
-    # accumulate modules in most-recent-call-last order
-    result = []
-    for frame, _ in traceback.walk_tb(exc_traceback):
-        code = frame.f_code
-        if hasattr(code, "co_filename"):
-            module = sys_modules.get(code.co_filename)
-            if module is not None:
-                result.append(module)
-    return tuple(result)
-
-
-def is_hot_exc_info(obj: Any) -> bool:
-    """:return bool:
-    
-    :param obj: object to inspect
-    
-    Accept any object and determine if it is a triple, along the lines
-    of what ``sys.exc_info`` returns when the interpreter is handling an
-    exception.
-    """
-    logger.debug("is_exc_info: enter")
-    if isinstance(obj, tuple) and len(obj) == 3:
-        if obj[0] is None:
-            return False
-        if (
-            isinstance(obj[0], BaseException)
-            and isinstance(obj[1], obj[0])
-            and isinstance(obj[2], TracebackType)
-        ):
-            return True
-    return False
-
-
-def exc_infos() -> tuple[tuple]:
-    """:return tuple[tuple]:
-    
-    Return a tuple of ``sys.exc_info``-like triples for the current
-    exception's entire ``__context__`` chain, including itself.
-    If there is no current exception, return an empty tuple.
-    """
-    logger.debug("exc_infos: enter")
-    result = [sys.exc_info()]
-    if result[-1][0] is None:
-        return ()
-    while result[-1][1].__context__ is not None:
-        result.append(
-            (
-                type(result[-1][1].__context__),
-                result[-1][1].__context__,
-                result[-1][1].__context__.__traceback__
-            )
-        )
-    return tuple(result)
+    # extract and return id
+    exc_type_name = None
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name):
+            return exc_type_name
+        exc_type_name = node.func.id
+    elif isinstance(node, ast.Name):
+        exc_type_name = node.id
+    return exc_type_name
 
 
 def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
@@ -346,7 +278,7 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
     logger.debug("raise_nodes_from_module_node: enter")
     exc_handlers = []
     name_map = defaultdict(list)
-    results = ()
+    raise_nodes = []
     for node in ast.walk(module):
         if isinstance(node, ast.Assign):
             name_map = _update_name_map(node, name_map)
@@ -354,8 +286,10 @@ def raise_nodes_from_module_node(module: ast.Module) -> tuple[ast.Raise]:
             exc_handlers.append(node)
             name_map = _update_name_map(node, name_map)
         elif isinstance(node, ast.Raise):
-            results += _handle_raise_node(node, exc_handlers, name_map)
-    return results
+            raise_nodes.append(node)
+    for i, node in enumerate(raise_nodes):
+        raise_nodes[i] = _handle_raise_node(node, exc_handlers, name_map)
+    return reduce(lambda x, y: x + y, raise_nodes)
 
 
 def _handle_raise_node(
@@ -420,22 +354,53 @@ def _handle_raise_node(
             raise RuntimeError(f"couldn't find exception: {node}")
 
     # case not bare raise
-    if isinstance(node.exc, (ast.Call, ast.Name)):
+    else:
         exc_name = _id_from_call_or_name_node(node.exc)
         exc = node.exc
 
         # possibly get actual exception from alias
         if name_map.get(exc_name, []):
-            exc = _traverse_get(name_map, exc_name)
+            for exc_name, exc in _generate_assignment_chain(name_map, exc_name):
+
+                # check exception handler names
+                for exc_handler in exc_handlers:
+                    if exc_handler.name != exc_name:
+                        continue
+                    if isinstance(exc_handler.type, ast.Tuple):
+                        for elt in exc_handler.type.elts:
+                            nodes.append(ast.Raise(exc=elt, cause=node.cause))
+                    elif isinstance(exc_handler.type, (ast.Call, ast.Name)):
+                        nodes.append(
+                            ast.Raise(exc=exc_handler.type, cause=node.cause)
+                        )
 
         # then add to nodes
         nodes.append(ast.Raise(exc=exc, cause=node.cause))
 
-    # maybe useful but mainly a hook for testing
-    nodes[-1].lineno = node.lineno
-
     # return tuple of raise nodes
     return tuple(nodes)
+
+
+def _generate_assignment_chain(name_map: dict, key: str) -> Generator:
+    """":return Generator: generates chained assignments
+    
+    :param name_map: dictionary of name-node pairs
+    :param key: starting target name
+    
+    Accept a mapping of name-node pairs and a key. Starting with the
+    key, find the corresponding node and yield it. Use that node's name
+    as the key to find another node. Keep going until the key is not in
+    the mapping and return.
+    """
+    logger.debug("_generate_assignment_chain: enter")
+    if key not in name_map:
+        return
+    while key in name_map:
+        value = name_map[key][-1]
+        yield key, value
+        key = None
+        if isinstance(value, ast.Name):
+            key = _id_from_call_or_name_node(value)
 
 
 def _update_name_map(
@@ -488,40 +453,96 @@ def _update_name_map(
     return name_map
 
 
-def _id_from_call_or_name_node(node: ast.Call | ast.Name) -> str | None:
-    """:return str | None:
+def random_exception(name: str=None, **attributes: dict) -> BaseException:
+    """:return BaseException: a ``BaseException`` subclass
     
-    :param node: instance of ``ast.Call`` or ``ast.Name``
+    :param name: optional subclass name string
+    :param **attributes: a mapping of attributes and methods
 
-    Extract the ``id`` attribute of the input node and return it.
+    Dynamically create and return a ``BaseException`` subclass. When
+    called without parameter ``name``, the returned subclass will
+    have a random 15-character (alpha only) name. Without any
+    keyword arguments, it will inheret ``BaseException.__dict__``.
+
+    The purpose of this function is to provide programs with the
+    ability to utilize private exceptions-- since the name and type of
+    the return value are created at runtime, it's not possible for an
+    exception handler to handle it unless the exception handler itself
+    has dynamic abilities. This function is used by ``exceptlib`` to
+    permit an interpreter to escape an exception handler that calls
+    ``exceptlib.ExceptionFrom`` with uninvolved modules.
     """
-    logger.debug("_id_from_call_or_name_node: enter")
-
-    # raise for bad nodes types
-    if not isinstance(node, (ast.Call, ast.Name)):
-        node = ast.dump(node)
-        logger.error("_id_from_call_or_name_node: bad_node=%s", node)
-        raise TypeError(f"expected ast.Call or ast.Name, got {node}")
-
-    # extract and return id
-    exc_type_name = None
-    if isinstance(node, ast.Call):
-        if not isinstance(node.func, ast.Name):
-            return exc_type_name
-        exc_type_name = node.func.id
-    elif isinstance(node, ast.Name):
-        exc_type_name = node.id
-    return exc_type_name
+    logger.debug("random_exception: enter")
+    name = name or "".join(sample(ascii_letters, 15))
+    return type(name, (BaseException,), attributes)
 
 
-def _traverse_get(name_map: dict, key: str) -> ast.AST | None:
-    """":return ast.AST:"""
-    logger.debug("_traverse_get: enter")
-    if key not in name_map:
-        return None
-    while key in name_map:
-        value = name_map[key][-1]
-        key = None
-        if isinstance(value, ast.Name):
-            key = _id_from_call_or_name_node(value)
-    return value
+def get_traceback_modules(exc_traceback: TracebackType) -> tuple[ModuleType]:
+    """:return tuple[ModuleType]: modules extracted from traceback
+    
+    :param exc_traceback: traceback object to extract modules from
+
+    Walk through the active exception's traceback and accumulate module
+    objects by inspecting file name attributes of code objects. Return
+    a tuple of the module objects.
+    """
+    logger.debug("get_traceback_modules: enter")
+
+    # avoid looping over sys.modules in the loop over tracebacksimprove
+    sys_modules = {
+        v.__file__: v for v in sys.modules.values() if hasattr(v, "__file__")
+    }
+
+    # accumulate modules in most-recent-call-last order
+    result = []
+    for frame, _ in traceback.walk_tb(exc_traceback):
+        code = frame.f_code
+        if hasattr(code, "co_filename"):
+            module = sys_modules.get(code.co_filename)
+            if module is not None:
+                result.append(module)
+    return tuple(result)
+
+
+def exc_infos() -> tuple[tuple]:
+    """:return tuple[tuple]:
+    
+    Return a tuple of ``sys.exc_info``-like triples for the current
+    exception's entire ``__context__`` chain, including itself.
+    If there is no current exception, return an empty tuple.
+    """
+    logger.debug("exc_infos: enter")
+    result = [sys.exc_info()]
+    if result[-1][0] is None:
+        return ()
+    while result[-1][1].__context__ is not None:
+        result.append(
+            (
+                type(result[-1][1].__context__),
+                result[-1][1].__context__,
+                result[-1][1].__context__.__traceback__
+            )
+        )
+    return tuple(result)
+
+
+def is_hot_exc_info(obj: Any) -> bool:
+    """:return bool:
+    
+    :param obj: object to inspect
+    
+    Accept any object and determine if it is a triple, along the lines
+    of what ``sys.exc_info`` returns when the interpreter is handling an
+    exception.
+    """
+    logger.debug("is_exc_info: enter")
+    if isinstance(obj, tuple) and len(obj) == 3:
+        if obj[0] is None:
+            return False
+        if (
+            isinstance(obj[0], BaseException)
+            and isinstance(obj[1], obj[0])
+            and isinstance(obj[2], TracebackType)
+        ):
+            return True
+    return False
