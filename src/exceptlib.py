@@ -369,7 +369,9 @@ def _handle_raise_node(
                         for elt in exc_handler.type.elts:
                             nodes.append(ast.Raise(exc=elt, cause=node.cause))
                     elif isinstance(exc_handler.type, (ast.Call, ast.Name)):
-                        nodes.append(ast.Raise(exc=exc_handler.type, cause=node.cause))
+                        nodes.append(
+                            ast.Raise(exc=exc_handler.type, cause=node.cause)
+                        )
 
         # then add to nodes
         nodes.append(ast.Raise(exc=exc, cause=node.cause))
