@@ -21,7 +21,7 @@ A shallow sequence diagram showing what happens when ``exceptlib.ExceptionFrom``
                 get_traceback_modules->>ExceptionFrom: tuple
             else modules not involved
                 ExceptionFrom->>random_exception: None
-                random_exception->>ExceptionFrom: BaseException
+                random_exception->>ExceptionFrom: tuple
             end
         else not active exception
             ExceptionFrom->>get_raised: ModuleType
